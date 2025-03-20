@@ -4,6 +4,9 @@
   margin: 0 auto;
   padding: 0; /* Xóa padding nếu không cần */
   text-align: left; /* Đổi về left để tránh căn giữa không mong muốn */
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .logo {

@@ -1,6 +1,6 @@
 import { useAuthStore } from "@/stores/authStore";
-import api from "@/config/api";
 import { UserInfo } from "@/types/user";
+import { userApi } from "@/config/api";
 
 interface LoginResponse {
   token: string;
@@ -14,7 +14,7 @@ export const useAuth = () => {
     email: string;
     password: string;
   }) => {
-    const response = await api.post<LoginResponse>("/Login", credentials);
+    const response = await userApi.post<LoginResponse>("/Login", credentials);
     const { token, user } = response.data;
     login(token, user);
   };
