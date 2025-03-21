@@ -1,6 +1,8 @@
 import { catalogApi } from "@/config/api";
 import {
   Category,
+  CreateCategoryRequest,
+  CreateCategoryResponse,
   GetCategoriesRequest,
   GetCategoriesResponse,
 } from "@/types/category";
@@ -19,9 +21,12 @@ export const getCategories = async ({
 };
 
 export const createCategory = async (
-  category: Omit<Category, "id" | "created" | "modified">
-): Promise<Category> => {
-  const response = await catalogApi.post("/categories", category);
+  data: CreateCategoryRequest
+): Promise<CreateCategoryResponse> => {
+  const response = await catalogApi.post<CreateCategoryResponse>(
+    "/categories",
+    data
+  );
   return response.data;
 };
 

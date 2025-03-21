@@ -1,23 +1,44 @@
 import React from "react";
 import { Layout, Menu } from "antd";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom"; // Thêm useLocation
 import {
   DashboardOutlined,
-  ShoppingOutlined, // Icon cho Products
-  ShoppingCartOutlined, // Icon cho Orders
-  UserOutlined, // Icon cho Customers
+  ShoppingOutlined,
+  ShoppingCartOutlined,
+  UserOutlined,
   SettingOutlined,
-  TagsOutlined, // Icon cho Categories
+  TagsOutlined,
 } from "@ant-design/icons";
 
 const { Sider } = Layout;
 
 const Sidebar: React.FC = () => {
+  const location = useLocation();
+
+  const getSelectedKey = () => {
+    switch (location.pathname) {
+      case "/":
+        return "1"; // Dashboard
+      case "/products":
+        return "2"; // Products
+      case "/orders":
+        return "3"; // Orders
+      case "/customers":
+        return "4"; // Customers
+      case "/categories":
+        return "5"; // Categories
+      case "/settings":
+        return "6"; // Settings
+      default:
+        return "1"; // Mặc định là Dashboard nếu không khớp
+    }
+  };
+
   return (
     <Sider width={250} style={{ background: "#fff" }}>
       <Menu
         mode="inline"
-        defaultSelectedKeys={["1"]}
+        selectedKeys={[getSelectedKey()]}
         style={{ height: "100%", borderRight: 0, paddingTop: "16px" }}
       >
         <Menu.Item key="1" icon={<DashboardOutlined />} className="text-lg">

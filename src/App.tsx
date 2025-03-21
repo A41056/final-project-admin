@@ -17,6 +17,8 @@ import Customers from "./pages/Customers";
 import Settings from "./pages/Settings";
 import { useAuthStore } from "./stores/authStore";
 import Categories from "./pages/Categories";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const { Content } = Layout;
 
@@ -32,6 +34,13 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 function App() {
   return (
     <Router>
+      <ToastContainer
+        position="top-right" // Vị trí mặc định
+        autoClose={3000} // Tự đóng sau 3 giây
+        hideProgressBar={false} // Hiển thị thanh tiến trình
+        closeOnClick // Đóng khi nhấp
+        pauseOnHover // Tạm dừng khi di chuột qua
+      />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route

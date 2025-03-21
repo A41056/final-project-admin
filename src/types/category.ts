@@ -6,6 +6,16 @@ export interface Category {
   isActive: boolean;
 }
 
+export interface CreateCategoryRequest {
+  names: string[];
+  isActive: boolean;
+}
+
+export interface CreateCategoryResponse {
+  createdIds: string[];
+  duplicates: string[];
+}
+
 export interface GetCategoriesResponse {
   categories: Category[];
 }
