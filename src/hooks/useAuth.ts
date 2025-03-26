@@ -14,9 +14,19 @@ export const useAuth = () => {
     email: string;
     password: string;
   }) => {
-    const response = await userApi.post<LoginResponse>("/Login", credentials);
-    const { token, user } = response.data;
-    login(token, user);
+    try {
+      const response = (await userApi.post(
+        "/Login",
+        credentials
+      )) as LoginResponse;
+      const { token, user } = response;
+      login(token, user);
+      return response;
+    } catch (error: any) {
+      const errorMessage =
+        error.message || "An unknown error occurred during login";
+      throw new Error(errorMessage);
+    }
   };
 
   return {

@@ -13,15 +13,17 @@ import { PlusOutlined } from "@ant-design/icons";
 import { TweenOneGroup, IEndCallback } from "rc-tween-one";
 import { Category, CreateCategoryResponse } from "@/types/category";
 import {
-  createCategory,
-  deleteCategory,
-  getCategories,
-  updateCategory,
-} from "@/services/categoryServices";
+  createCategoryMutation,
+  deleteCategoryMutation,
+  getCategoriesQuery,
+  updateCategoryMutation,
+} from "@/services/categoryServices"; // Sửa import
 import { toast } from "react-toastify";
-import ConfirmModal from "@/components/ConfirmModal"; // Import ConfirmModal
+import ConfirmModal from "@/components/ConfirmModal";
+import { useQuery, useMutation, useQueryClient } from "react-query";
 
 const Categories: React.FC = () => {
+  const queryClient = useQueryClient();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({
@@ -43,10 +45,10 @@ const Categories: React.FC = () => {
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const response = await getCategories({
+      const response = await getCategoriesQuery({
         pageNumber: pagination.pageNumber,
         pageSize: pagination.pageSize,
-      });
+      }).queryFn();
       console.log("Fetched categories:", response.categories);
       setCategories(response.categories);
       setPagination((prev) => ({ ...prev, total: response.categories.length }));
@@ -82,10 +84,10 @@ const Categories: React.FC = () => {
   const handleSubmit = async (values: { name: string; isActive: boolean }) => {
     try {
       if (editingCategory) {
-        const updatedCategory = await updateCategory(
-          editingCategory.id,
-          values
-        );
+        const updatedCategory = await updateCategoryMutation().mutationFn({
+          id: editingCategory.id,
+          data: values,
+        });
         setCategories(
           categories.map((cat) =>
             cat.id === updatedCategory.id ? updatedCategory : cat
@@ -93,7 +95,7 @@ const Categories: React.FC = () => {
         );
         toast.success("Category updated successfully");
       } else {
-        const newCategory = await createCategory({
+        const newCategory = await createCategoryMutation().mutationFn({
           names: [values.name],
           isActive: values.isActive,
         });
@@ -108,7 +110,7 @@ const Categories: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteCategory(id);
+      await deleteCategoryMutation().mutationFn(id);
       setCategories(categories.filter((cat) => cat.id !== id));
       toast.success("Category deleted successfully");
     } catch (error: any) {
@@ -125,7 +127,7 @@ const Categories: React.FC = () => {
   };
 
   const showConfirmDelete = (id: string) => {
-    console.log("Showing confirm delete for ID:", id); // Debug
+    console.log("Showing confirm delete for ID:", id);
     setConfirmText(
       `Are you sure you want to delete the category "${
         categories.find((cat) => cat.id === id)?.name
@@ -152,7 +154,7 @@ const Categories: React.FC = () => {
   };
 
   const handleCancelConfirm = () => {
-    console.log("Cancel confirm"); // Debug
+    console.log("Cancel confirm");
     setConfirmVisible(false);
   };
 
@@ -185,10 +187,11 @@ const Categories: React.FC = () => {
         names: uniqueNewNames,
         isActive: true,
       });
-      const result: CreateCategoryResponse = await createCategory({
-        names: uniqueNewNames,
-        isActive: true,
-      });
+      const result: CreateCategoryResponse =
+        await createCategoryMutation().mutationFn({
+          names: uniqueNewNames,
+          isActive: true,
+        });
 
       await fetchCategories();
 
@@ -364,7 +367,6 @@ const Categories: React.FC = () => {
         </Form>
       </Modal>
 
-      {/* Thêm ConfirmModal */}
       <ConfirmModal
         visible={confirmVisible}
         text={confirmText}
