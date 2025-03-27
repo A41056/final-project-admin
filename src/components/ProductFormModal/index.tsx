@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Modal,
   Form,
@@ -11,36 +11,150 @@ import {
   Table,
   InputNumber,
   Radio,
+  Checkbox,
+  type InputRef,
 } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
+import { UploadOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Category } from "@/types/category";
 import {
   Product,
   CreateProductRequest,
   ProductVariant,
   VariantProperty,
+  VariantType,
+  VariantValue,
+  ProductFormModalProps,
 } from "@/types/product";
 import { toast } from "react-toastify";
 import moment from "moment";
+import { v4 as uuidv4 } from "uuid";
+import { uploadFileMutation } from "@/services/mediaServices";
+import { useMutation } from "react-query";
+import { useAuthStore } from "@/stores/authStore";
+
+const PUBLIC_CLOUDflare_URL =
+  import.meta.env.VITE_PUBLIC_CLOUDflare_URL ||
+  "https://pub-ba5e3c67382a42e7830b11e37a48948a.r2.dev";
 
 const { Option } = Select;
 
-interface VariantType {
+const VariantInput: React.FC<{
   type: string;
-  values: { value: string; image?: string }[];
-}
+  value: VariantValue;
+  isFirstType: boolean;
+  onUpdate: (id: string, newValue: string) => void;
+  onDelete: (id: string) => void;
+  onImageUpload: (id: string, file: File) => Promise<void>;
+  onImageRemove: (id: string) => void;
+  onAddNew: (type: string) => void;
+}> = React.memo(
+  ({
+    type,
+    value,
+    isFirstType,
+    onUpdate,
+    onDelete,
+    onImageUpload,
+    onImageRemove,
+    onAddNew,
+  }) => {
+    const inputRef = useRef<InputRef>(null);
 
-interface ProductFormModalProps {
-  visible: boolean;
-  onCancel: () => void;
-  onSubmit: (values: CreateProductRequest) => void;
-  editingProduct: Product | null;
-  categoriesData: { categories: Category[] } | undefined;
-  uploadProps: any;
-  generateVariants: () => ProductVariant[];
-  variantTypes: VariantType[];
-  setVariantTypes: React.Dispatch<React.SetStateAction<VariantType[]>>;
-}
+    const uploadBoxStyle = {
+      position: "relative" as const,
+      width: "60px",
+      height: "60px",
+      border: "1px dashed #d9d9d9",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+      cursor: "pointer" as const,
+    };
+
+    const imageStyle = {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover" as const,
+    };
+
+    const overlayStyle = {
+      position: "absolute" as const,
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      background: "rgba(0, 0, 0, 0.5)",
+      display: "none",
+      alignItems: "center",
+      justifyContent: "center",
+    };
+
+    const handleEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter" && value.value.trim()) {
+        onAddNew(type);
+        setTimeout(() => inputRef.current?.focus(), 0);
+      }
+    };
+
+    const handleUploadChange = ({ fileList }: { fileList: any[] }) => {
+      if (fileList.length > 0 && fileList[0].originFileObj) {
+        onImageUpload(value.id, fileList[0].originFileObj);
+      }
+    };
+
+    return (
+      <Space style={{ marginBottom: 8 }}>
+        <Input
+          ref={inputRef}
+          value={value.value}
+          onChange={(e) => onUpdate(value.id, e.target.value)}
+          onPressEnter={handleEnter}
+          placeholder={`Enter ${type} value`}
+          style={{ width: 200 }}
+        />
+        {isFirstType && (
+          <div style={uploadBoxStyle}>
+            <Upload
+              showUploadList={false}
+              beforeUpload={() => false}
+              onChange={handleUploadChange}
+            >
+              {value.image ? (
+                <img src={value.image} alt={value.value} style={imageStyle} />
+              ) : (
+                <UploadOutlined style={{ fontSize: 20, color: "#999" }} />
+              )}
+            </Upload>
+            {value.image && (
+              <div
+                className="overlay"
+                style={{ ...overlayStyle, display: "flex" }}
+                onMouseEnter={(e) => (e.currentTarget.style.display = "flex")}
+                onMouseLeave={(e) => (e.currentTarget.style.display = "none")}
+              >
+                <Button
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  danger
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onImageRemove(value.id);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+        <Button
+          icon={<DeleteOutlined />}
+          danger
+          onClick={() => onDelete(value.id)}
+        />
+      </Space>
+    );
+  }
+);
 
 const ProductFormModal: React.FC<ProductFormModalProps> = ({
   visible,
@@ -56,7 +170,26 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [form] = Form.useForm();
   const [variantEnabled, setVariantEnabled] = useState(false);
   const [newVariantTypeName, setNewVariantTypeName] = useState<string>("");
-  const [priceFilter, setPriceFilter] = useState<string[]>([]);
+  const [generatedVariants, setGeneratedVariants] = useState<ProductVariant[]>(
+    []
+  );
+  const [updateAll, setUpdateAll] = useState(false);
+  const [filterValues, setFilterValues] = useState<
+    Record<string, string | undefined>
+  >({});
+  const [updatePrice, setUpdatePrice] = useState<number | null>(null);
+  const [updateStock, setUpdateStock] = useState<number | null>(null);
+
+  const uploadMutation = useMutation({
+    ...uploadFileMutation(),
+    onSuccess: (data) => {
+      toast.success("Variant image uploaded successfully");
+    },
+    onError: (error: any) => {
+      toast.error("Failed to upload variant image");
+      console.error(error);
+    },
+  });
 
   useEffect(() => {
     if (editingProduct) {
@@ -71,12 +204,15 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             if (!existingType) {
               acc.push({
                 type: prop.type,
-                values: [{ value: prop.value, image: prop.image }],
+                values: [
+                  { id: uuidv4(), value: prop.value, image: prop.image },
+                ],
               });
             } else if (
               !existingType.values.some((v) => v.value === prop.value)
             ) {
               existingType.values.push({
+                id: uuidv4(),
                 value: prop.value,
                 image: prop.image,
               });
@@ -87,42 +223,238 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         []
       );
       setVariantTypes(types);
+      setGeneratedVariants(editingProduct.variants);
       setVariantEnabled(types.length > 0);
+      // Đồng bộ prices từ editingProduct
+      const prices: Record<string, { price: number; stockCount: number }> = {};
+      editingProduct.variants.forEach((variant) => {
+        const key = variant.properties.map((p) => p.value).join(" ");
+        prices[key] = {
+          price: variant.price,
+          stockCount: variant.stockCount,
+        };
+      });
+      form.setFieldsValue({ prices });
     } else {
       form.resetFields();
       setVariantTypes([]);
+      setGeneratedVariants([]);
       setVariantEnabled(false);
     }
   }, [editingProduct, form, setVariantTypes]);
 
-  const handleAddVariantType = () => {
+  const handleAddVariantType = useCallback(() => {
     if (newVariantTypeName.trim()) {
       setVariantTypes((prev) => [
         ...prev,
-        { type: newVariantTypeName.trim(), values: [] },
+        {
+          type: newVariantTypeName.trim(),
+          values: [
+            {
+              id: uuidv4(),
+              value: "",
+              image: prev.length === 0 ? "" : undefined,
+            },
+          ],
+        },
       ]);
       setNewVariantTypeName("");
     }
+  }, [newVariantTypeName, setVariantTypes]);
+
+  const handleAddNewVariantValue = useCallback(
+    (type: string) => {
+      setVariantTypes((prev) =>
+        prev.map((t) =>
+          t.type === type
+            ? {
+                ...t,
+                values: [
+                  ...t.values,
+                  {
+                    id: uuidv4(),
+                    value: "",
+                    image: t.type === variantTypes[0]?.type ? "" : undefined,
+                  },
+                ],
+              }
+            : t
+        )
+      );
+    },
+    [setVariantTypes, variantTypes]
+  );
+
+  const handleUpdateVariantValue = useCallback(
+    (type: string, id: string, newValue: string) => {
+      setVariantTypes((prev) =>
+        prev.map((t) =>
+          t.type === type
+            ? {
+                ...t,
+                values: t.values.map((v) =>
+                  v.id === id ? { ...v, value: newValue } : v
+                ),
+              }
+            : t
+        )
+      );
+    },
+    [setVariantTypes]
+  );
+
+  const handleDeleteVariantValue = useCallback(
+    (type: string, id: string) => {
+      setVariantTypes((prev) =>
+        prev.map((t) =>
+          t.type === type
+            ? { ...t, values: t.values.filter((v) => v.id !== id) }
+            : t
+        )
+      );
+    },
+    [setVariantTypes]
+  );
+
+  const handleImageUpload = useCallback(
+    async (id: string, file: File) => {
+      const fileTypes = JSON.parse(localStorage.getItem("fileTypes") || "[]");
+      const fileType = fileTypes.find(
+        (ft: any) => ft.identifier === "ImageProduct"
+      );
+      const fileTypeId = fileType
+        ? fileType.id
+        : "a7ff0762-931c-4faf-8ece-e158ea48bd0c";
+      const userId =
+        useAuthStore.getState().user?.id ||
+        "550e8400-e29b-41d4-a716-446655440000";
+
+      await uploadMutation.mutateAsync(
+        { file, fileTypeId, userId },
+        {
+          onSuccess: (data) => {
+            const fileName = data.storageLocation;
+            const imageUrl = `${PUBLIC_CLOUDflare_URL}/${fileName}`;
+            setVariantTypes((prev) =>
+              prev.map((t) => ({
+                ...t,
+                values: t.values.map((v) =>
+                  v.id === id ? { ...v, image: imageUrl } : v
+                ),
+              }))
+            );
+          },
+          onError: (error: any) => {
+            toast.error("Failed to upload variant image");
+            console.error(error);
+          },
+        }
+      );
+    },
+    [uploadMutation, setVariantTypes]
+  );
+
+  const handleRemoveImage = useCallback(
+    (type: string, id: string) => {
+      setVariantTypes((prev) =>
+        prev.map((t) =>
+          t.type === type
+            ? {
+                ...t,
+                values: t.values.map((v) =>
+                  v.id === id ? { ...v, image: undefined } : v
+                ),
+              }
+            : t
+        )
+      );
+    },
+    [setVariantTypes]
+  );
+
+  const handleGeneratePriceTable = useCallback(() => {
+    const newVariants = generateVariants(variantTypes);
+    setGeneratedVariants(newVariants);
+    setFilterValues({});
+    setUpdatePrice(null);
+    setUpdateStock(null);
+    setUpdateAll(false);
+    const prices: Record<string, { price: number; stockCount: number }> = {};
+    newVariants.forEach((variant) => {
+      const key = variant.properties.map((p) => p.value).join(" ");
+      prices[key] = {
+        price: variant.price,
+        stockCount: variant.stockCount,
+      };
+    });
+    form.setFieldsValue({ prices });
+  }, [generateVariants, variantTypes, form]);
+
+  const handleUpdatePrices = useCallback(() => {
+    setGeneratedVariants((prev) => {
+      const updatedVariants = prev.map((variant) => {
+        const matchesFilter =
+          updateAll ||
+          Object.entries(filterValues).every(
+            ([type, value]) =>
+              !value ||
+              variant.properties.some(
+                (prop) => prop.type === type && prop.value === value
+              )
+          );
+        if (matchesFilter) {
+          return {
+            ...variant,
+            price: updatePrice !== null ? updatePrice : variant.price,
+            stockCount: updateStock !== null ? updateStock : variant.stockCount,
+          };
+        }
+        return variant;
+      });
+
+      const prices: Record<string, { price: number; stockCount: number }> = {};
+      updatedVariants.forEach((variant) => {
+        const key = variant.properties.map((p) => p.value).join(" ");
+        prices[key] = {
+          price: variant.price,
+          stockCount: variant.stockCount,
+        };
+      });
+      form.setFieldsValue({ prices });
+
+      return updatedVariants;
+    });
+  }, [updateAll, filterValues, updatePrice, updateStock, form]);
+
+  const handleFilterChange = (type: string, value: string | undefined) => {
+    setFilterValues((prev) => ({ ...prev, [type]: value }));
   };
 
-  const handleAddVariantValue = (type: string, value: string) => {
-    setVariantTypes((prev) =>
-      prev.map((t) =>
-        t.type === type && !t.values.some((v) => v.value === value)
-          ? {
-              ...t,
-              values: [
-                ...t.values,
-                {
-                  value,
-                  image: t.type === variantTypes[0]?.type ? "" : undefined,
-                },
-              ],
-            }
-          : t
-      )
-    );
-  };
+  const handleSubmit = useCallback(
+    (values: any) => {
+      const request: CreateProductRequest = {
+        name: values.name,
+        categoryIds: values.categoryIds,
+        description: values.description || "",
+        imageFiles: values.imageFiles.map(
+          (file: any) => file.response?.fileId || file.url || file.name
+        ),
+        isHot: values.isHot,
+        isActive: values.isActive,
+        variants: generatedVariants.map((variant) => ({
+          properties: variant.properties,
+          price:
+            values.prices[variant.properties.map((p) => p.value).join(" ")]
+              ?.price || 0,
+          stockCount:
+            values.prices[variant.properties.map((p) => p.value).join(" ")]
+              ?.stockCount || 0,
+        })),
+      };
+      onSubmit(request);
+    },
+    [generatedVariants, onSubmit]
+  );
 
   const variantColumns = [
     {
@@ -138,40 +470,6 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         />
       ),
     },
-    ...(variantTypes.length > 0 && variantTypes[0].type === "Color"
-      ? [
-          {
-            title: "Image",
-            dataIndex: "image",
-            key: "image",
-            render: (_: any, record: ProductVariant) => {
-              const firstProp = record.properties.find(
-                (p) => p.type === "Color"
-              );
-              return firstProp ? (
-                <Form.Item
-                  name={["variantImages", firstProp.value]}
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => (Array.isArray(e) ? e : e.fileList)}
-                  noStyle
-                >
-                  <Upload
-                    {...uploadProps}
-                    listType="picture"
-                    maxCount={1}
-                    beforeUpload={(file) => {
-                      uploadProps.beforeUpload(file);
-                      return false;
-                    }}
-                  >
-                    <Button icon={<UploadOutlined />}>Upload</Button>
-                  </Upload>
-                </Form.Item>
-              ) : null;
-            },
-          },
-        ]
-      : []),
     {
       title: "Price",
       dataIndex: "price",
@@ -183,9 +481,10 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             record.properties.map((p) => p.value).join(" "),
             "price",
           ]}
+          initialValue={record.price}
           noStyle
         >
-          <InputNumber min={0} />
+          <InputNumber min={0} step={0.01} />
         </Form.Item>
       ),
     },
@@ -200,6 +499,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             record.properties.map((p) => p.value).join(" "),
             "stockCount",
           ]}
+          initialValue={record.stockCount}
           noStyle
         >
           <InputNumber min={0} />
@@ -216,7 +516,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       onOk={() => form.submit()}
       width={1000}
     >
-      <Form form={form} layout="vertical" onFinish={onSubmit}>
+      <Form form={form} layout="vertical" onFinish={handleSubmit}>
         <Form.Item
           name="name"
           label="Name"
@@ -281,70 +581,116 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             {variantTypes.map((typeObj, index) => (
               <Form.Item key={typeObj.type} label={`${typeObj.type} Values`}>
                 <Space direction="vertical" style={{ width: "100%" }}>
-                  <Input.Search
-                    placeholder={`Enter ${typeObj.type} value (e.g., Red, 64GB)`}
-                    enterButton="Add"
-                    onSearch={(value) =>
-                      handleAddVariantValue(typeObj.type, value)
-                    }
-                  />
-                  <Select
-                    mode="multiple"
+                  {typeObj.values.map((v) => (
+                    <VariantInput
+                      key={v.id}
+                      type={typeObj.type}
+                      value={v}
+                      isFirstType={index === 0}
+                      onUpdate={handleUpdateVariantValue.bind(
+                        null,
+                        typeObj.type
+                      )}
+                      onDelete={handleDeleteVariantValue.bind(
+                        null,
+                        typeObj.type
+                      )}
+                      onImageUpload={handleImageUpload}
+                      onImageRemove={handleRemoveImage.bind(null, typeObj.type)}
+                      onAddNew={handleAddNewVariantValue}
+                    />
+                  ))}
+                  <Button
+                    type="dashed"
+                    onClick={() => handleAddNewVariantValue(typeObj.type)}
                     style={{ width: "100%" }}
-                    placeholder={`Current ${typeObj.type} values`}
-                    value={typeObj.values.map((v) => v.value)}
-                    onChange={(values) =>
-                      setVariantTypes((prev) =>
-                        prev.map((t) =>
-                          t.type === typeObj.type
-                            ? {
-                                ...t,
-                                values: values.map((v) => ({
-                                  value: v,
-                                  image: t.values.find((x) => x.value === v)
-                                    ?.image,
-                                })),
-                              }
-                            : t
-                        )
-                      )
-                    }
                   >
-                    {typeObj.values.map((v) => (
-                      <Option key={v.value} value={v.value}>
-                        {v.value}
-                      </Option>
-                    ))}
-                  </Select>
+                    Add New {typeObj.type} Value
+                  </Button>
                 </Space>
               </Form.Item>
             ))}
-            <Form.Item label="Set Prices By">
-              <Select
-                mode="multiple"
-                style={{ width: "100%" }}
-                placeholder="Select variant types to group prices"
-                onChange={(value) => setPriceFilter(value)}
-                value={priceFilter}
-              >
-                {variantTypes.map((typeObj) => (
-                  <Option key={typeObj.type} value={typeObj.type}>
-                    {typeObj.type}
-                  </Option>
-                ))}
-              </Select>
+            <Form.Item label="Generate Price Table">
+              <Button type="primary" onClick={handleGeneratePriceTable}>
+                Generate Price Table
+              </Button>
             </Form.Item>
-            <Form.Item label="Variants">
-              <Table
-                columns={variantColumns}
-                dataSource={generateVariants()}
-                pagination={false}
-                rowKey={(record) =>
-                  record.properties.map((p) => p.value).join(" ")
-                }
-                size="small"
-              />
-            </Form.Item>
+            {generatedVariants.length > 0 && (
+              <>
+                <Form.Item label="Update Prices and Stock">
+                  <Space direction="horizontal" align="center" size="middle">
+                    {variantTypes.map((typeObj) => (
+                      <Space key={typeObj.type} direction="vertical" size={4}>
+                        <label>{`Filter by ${typeObj.type}`}</label>
+                        <Select
+                          placeholder={`Select ${typeObj.type}`}
+                          allowClear
+                          style={{ width: 150 }}
+                          value={filterValues[typeObj.type]}
+                          onChange={(value) =>
+                            handleFilterChange(typeObj.type, value)
+                          }
+                        >
+                          {typeObj.values.map((v) => (
+                            <Option key={v.id} value={v.value}>
+                              {v.value}
+                            </Option>
+                          ))}
+                        </Select>
+                      </Space>
+                    ))}
+                    <Space direction="vertical" size={4}>
+                      <label>Price</label>
+                      <InputNumber
+                        min={0}
+                        step={0.01}
+                        style={{ width: 100 }}
+                        value={updatePrice}
+                        onChange={(value) =>
+                          setUpdatePrice(value as number | null)
+                        }
+                      />
+                    </Space>
+                    <Space direction="vertical" size={4}>
+                      <label>Stock Count</label>
+                      <InputNumber
+                        min={0}
+                        style={{ width: 100 }}
+                        value={updateStock}
+                        onChange={(value) =>
+                          setUpdateStock(value as number | null)
+                        }
+                      />
+                    </Space>
+                    <Checkbox
+                      checked={updateAll}
+                      onChange={(e) => setUpdateAll(e.target.checked)}
+                      style={{ marginTop: 24 }}
+                    >
+                      Update All Variants
+                    </Checkbox>
+                    <Button
+                      type="primary"
+                      onClick={handleUpdatePrices}
+                      style={{ marginTop: 24 }}
+                    >
+                      Update Selected
+                    </Button>
+                  </Space>
+                </Form.Item>
+                <Form.Item label="Variants">
+                  <Table
+                    columns={variantColumns}
+                    dataSource={generatedVariants}
+                    pagination={false}
+                    rowKey={(record) =>
+                      record.properties.map((p) => p.value).join(" ")
+                    }
+                    size="small"
+                  />
+                </Form.Item>
+              </>
+            )}
           </>
         )}
       </Form>

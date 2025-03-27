@@ -1,7 +1,19 @@
 import { mediaApi } from "@/config/api";
+import { useQuery } from "react-query";
 
 export interface UploadFileResponse {
   fileId: string;
+  storageLocation: string;
+}
+
+export interface FileType {
+  id: string;
+  name?: string;
+  identifier: string;
+  defaultStorageLocation?: string;
+  fileExtensions?: string;
+  fileNamePattern?: string;
+  maxSize: number;
 }
 
 export const uploadFileMutation = () => ({
@@ -30,3 +42,22 @@ export const uploadFileMutation = () => ({
     return mediaApi.uploadFile(formData) as Promise<UploadFileResponse>;
   },
 });
+
+export const getAllFileTypes = async (): Promise<FileType[]> => {
+  return mediaApi.getFileTypes("/filetypes");
+};
+
+export const useGetAllFileTypes = () => {
+  return useQuery<FileType[], Error>({
+    queryKey: ["fileTypes"],
+    queryFn: getAllFileTypes,
+    staleTime: Infinity,
+    cacheTime: Infinity,
+    onSuccess: (data) => {
+      localStorage.setItem("fileTypes", JSON.stringify(data));
+    },
+    onError: (error) => {
+      console.error("Failed to fetch file types:", error);
+    },
+  });
+};

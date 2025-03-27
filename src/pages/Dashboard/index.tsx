@@ -1,13 +1,14 @@
-import React from "react";
+import { useGetAllFileTypes } from "@/services/mediaServices";
 
 const Dashboard: React.FC = () => {
+  const { data: fileTypes, isLoading, error } = useGetAllFileTypes();
+
+  if (isLoading) return <div>Loading file types...</div>;
+  if (error) return <div>Error loading file types: {error.message}</div>;
+
   return (
-    <div className="w-full">
-      <h2 className="text-2xl font-bold">Welcome to the Dashboard</h2>
-      <p className="mt-4 text-lg">
-        This is a sample dashboard content that should span the full width of
-        the available space.
-      </p>
+    <div>
+      <pre>{JSON.stringify(fileTypes, null, 2)}</pre>
     </div>
   );
 };

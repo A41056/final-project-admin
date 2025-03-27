@@ -1,3 +1,5 @@
+import { Category } from "./category";
+
 export interface Product {
   id: string;
   name: string;
@@ -51,4 +53,27 @@ export interface GetProductsRequest {
 export interface GetProductsResponse {
   products: Product[];
   totalItems: number;
+}
+
+export interface VariantValue {
+  id: string;
+  value: string;
+  image?: string;
+}
+
+export interface VariantType {
+  type: string;
+  values: VariantValue[];
+}
+
+export interface ProductFormModalProps {
+  visible: boolean;
+  onCancel: () => void;
+  onSubmit: (values: CreateProductRequest) => void;
+  editingProduct: Product | null;
+  categoriesData: { categories: Category[] } | undefined;
+  uploadProps: any;
+  generateVariants: (variantTypes: VariantType[]) => ProductVariant[];
+  variantTypes: VariantType[];
+  setVariantTypes: React.Dispatch<React.SetStateAction<VariantType[]>>;
 }

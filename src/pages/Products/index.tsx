@@ -25,6 +25,8 @@ import {
   CreateProductRequest,
   ProductVariant,
   VariantProperty,
+  VariantType,
+  VariantValue,
 } from "@/types/product";
 import { Category } from "@/types/category";
 import { useQuery, useMutation, useQueryClient } from "react-query";
@@ -32,12 +34,11 @@ import { useAuthStore } from "@/stores/authStore";
 import ProductFormModal from "@/components/ProductFormModal";
 import moment from "moment";
 
-const { Option } = Select;
+const PUBLIC_CLOUDflare_URL =
+  import.meta.env.VITE_PUBLIC_CLOUDflare_URL ||
+  "https://pub-ba5e3c67382a42e7830b11e37a48948a.r2.dev";
 
-interface VariantType {
-  type: string;
-  values: { value: string; image?: string }[];
-}
+const { Option } = Select;
 
 const ProductsPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -108,18 +109,17 @@ const ProductsPage: React.FC = () => {
   const uploadMutation = useMutation({
     ...uploadFileMutation(),
     onSuccess: (data, variables) => {
-      const imageUrl = `${
-        import.meta.env.MEDIA_API_URL || "http://localhost:6010"
-      }/files/${data.fileId}`;
+      const fileName = data.storageLocation;
+      const fileUrl = `${PUBLIC_CLOUDflare_URL}/${fileName}`;
       const currentImageFiles = form.getFieldValue("imageFiles") || [];
-      form.setFieldsValue({ imageFiles: [...currentImageFiles, imageUrl] });
+      form.setFieldsValue({ imageFiles: [...currentImageFiles, fileUrl] });
       setFileList((prev) => [
         ...prev,
         {
           uid: variables.file.name,
           name: variables.file.name,
           status: "done",
-          url: imageUrl,
+          url: fileUrl,
         },
       ]);
       toast.success("Image uploaded successfully");
@@ -148,22 +148,10 @@ const ProductsPage: React.FC = () => {
   };
 
   const handleSubmit = (values: CreateProductRequest) => {
-    const variants = generateVariants();
-    const variantImages = form.getFieldValue("variantImages") || {};
-    variants.forEach((variant) => {
-      const firstProp = variant.properties.find(
-        (p) => p.type === variantTypes[0]?.type
-      );
-      if (firstProp && variantImages[firstProp.value]) {
-        const imageFile = variantImages[firstProp.value][0];
-        firstProp.image = imageFile?.url || imageFile?.response?.fileId || "";
-      }
-    });
-    const updatedValues = { ...values, variants };
     if (editingProduct) {
-      updateMutation.mutate({ id: editingProduct.id, data: updatedValues });
+      updateMutation.mutate({ id: editingProduct.id, data: values });
     } else {
-      createMutation.mutate(updatedValues);
+      createMutation.mutate(values);
     }
   };
 
@@ -183,7 +171,13 @@ const ProductsPage: React.FC = () => {
     const userId =
       useAuthStore.getState().user?.id ||
       "550e8400-e29b-41d4-a716-446655440000";
-    const fileTypeId = "a7ff0762-931c-4faf-8ece-e158ea48bd0c";
+    const fileTypes = JSON.parse(localStorage.getItem("fileTypes") || "[]");
+    const fileType = fileTypes.find(
+      (ft: any) => ft.identifier === "ImageProduct"
+    );
+    const fileTypeId = fileType
+      ? fileType.id
+      : "a7ff0762-931c-4faf-8ece-e158ea48bd0c";
     const productId = editingProduct?.id;
 
     uploadMutation.mutate({ file, fileTypeId, userId, productId });
@@ -204,7 +198,6 @@ const ProductsPage: React.FC = () => {
   const generateVariants = (): ProductVariant[] => {
     const types = variantTypes.map((t) => t.type);
     const variants: ProductVariant[] = [];
-    const prices = form.getFieldValue("prices") || {};
 
     if (types.length === 0) return [];
 
@@ -213,22 +206,26 @@ const ProductsPage: React.FC = () => {
       remainingTypes: string[]
     ): ProductVariant[] => {
       if (remainingTypes.length === 0) {
-        const name = current.map((p) => p.value).join(" ");
         return [
           {
             properties: current,
-            price: prices[name]?.price || 0,
-            stockCount: prices[name]?.stockCount || 0,
+            price: 0, // Giá trị mặc định, sẽ được cập nhật trong ProductFormModal
+            stockCount: 0,
           },
         ];
       }
 
       const type = remainingTypes[0];
-      const values = variantTypes.find((t) => t.type === type)?.values || [];
+      const values =
+        variantTypes.find((t: VariantType) => t.type === type)?.values || [];
       const result: ProductVariant[] = [];
 
-      values.forEach((v) => {
-        const newProperty = { type, value: v.value, image: v.image };
+      values.forEach((v: VariantValue) => {
+        const newProperty: VariantProperty = {
+          type,
+          value: v.value,
+          image: v.image,
+        };
         result.push(
           ...generateCombinations(
             [...current, newProperty],

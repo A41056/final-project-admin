@@ -7,6 +7,7 @@ const ORDER_API_URL = import.meta.env.ORDER_API_URL || "http://localhost:6003";
 const BASKET_API_URL =
   import.meta.env.BASKET_API_URL || "http://localhost:6001";
 const MEDIA_API_URL = import.meta.env.MEDIA_API_URL || "http://localhost:6010";
+
 const handleApiError = (response: Response) => {
   if (response.status === 401) {
     useAuthStore.getState().logout();
@@ -14,6 +15,7 @@ const handleApiError = (response: Response) => {
   }
   throw new Error(`API error: ${response.status} - ${response.statusText}`);
 };
+
 const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   const token = useAuthStore.getState().token;
   const headers = new Headers(options.headers || {});
@@ -33,6 +35,7 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
 
   return response.json();
 };
+
 const fetchFormDataWithAuth = async (url: string, formData: FormData) => {
   const token = useAuthStore.getState().token;
   const headers = new Headers();
@@ -138,6 +141,8 @@ export const basketApi = {
 };
 
 export const mediaApi = {
+  getFileTypes: (endpoint: string) =>
+    fetchWithAuth(`${MEDIA_API_URL}${endpoint}`),
   uploadFile: (formData: FormData) =>
     fetchFormDataWithAuth(`${MEDIA_API_URL}/files`, formData),
 };
