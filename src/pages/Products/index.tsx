@@ -9,8 +9,16 @@ import {
   Select,
   Form,
   Modal,
+  Switch,
 } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  FireOutlined,
+  CheckOutlined,
+  CloseOutlined,
+} from "@ant-design/icons";
 import { toast } from "react-toastify";
 import {
   getProductsQuery,
@@ -209,7 +217,7 @@ const ProductsPage: React.FC = () => {
         return [
           {
             properties: current,
-            price: 0, // Giá trị mặc định, sẽ được cập nhật trong ProductFormModal
+            price: 0,
             stockCount: 0,
           },
         ];
@@ -240,7 +248,7 @@ const ProductsPage: React.FC = () => {
     return generateCombinations([], types);
   };
 
-  const columns = [
+  const columns: import("antd").TableColumnType<Product>[] = [
     { title: "Name", dataIndex: "name", key: "name" },
     {
       title: "Variants",
@@ -254,20 +262,32 @@ const ProductsPage: React.FC = () => {
       dataIndex: "isHot",
       key: "isHot",
       render: (isHot: boolean) => (
-        <span style={{ color: isHot ? "#ff4d4f" : "#8c8c8c" }}>
-          {isHot ? "Yes" : "No"}
+        <span>
+          {isHot ? (
+            <FireOutlined style={{ color: "#ff4500", fontSize: "20px" }} />
+          ) : (
+            <FireOutlined style={{ color: "#d3d3d3", fontSize: "20px" }} />
+          )}
         </span>
       ),
+      align: "center" as const, // Ép kiểu thành literal "center"
     },
     {
       title: "Is Active",
       dataIndex: "isActive",
       key: "isActive",
       render: (isActive: boolean) => (
-        <span style={{ color: isActive ? "#52c41a" : "#f5222d" }}>
-          {isActive ? "Yes" : "No"}
-        </span>
+        <Switch
+          checked={isActive}
+          checkedChildren={<CheckOutlined />}
+          unCheckedChildren={<CloseOutlined />}
+          disabled
+          style={{
+            backgroundColor: isActive ? "#52c41a" : "#d9d9d9",
+          }}
+        />
       ),
+      align: "center" as const, // Ép kiểu thành literal "center"
     },
     {
       title: "Created",
@@ -321,7 +341,11 @@ const ProductsPage: React.FC = () => {
         </Col>
         <Col span={4}>
           <Select
-            placeholder="Filter by Is Hot"
+            placeholder={
+              <span>
+                <FireOutlined /> Filter by Is Hot
+              </span>
+            }
             style={{ width: "100%" }}
             onChange={(value) =>
               handleFilterChange(
@@ -331,13 +355,21 @@ const ProductsPage: React.FC = () => {
             }
             allowClear
           >
-            <Option value="true">Yes</Option>
-            <Option value="false">No</Option>
+            <Option value="true">
+              <FireOutlined style={{ color: "#ff4500", marginRight: 8 }} /> Yes
+            </Option>
+            <Option value="false">
+              <FireOutlined style={{ color: "#d3d3d3", marginRight: 8 }} /> No
+            </Option>
           </Select>
         </Col>
         <Col span={4}>
           <Select
-            placeholder="Filter by Is Active"
+            placeholder={
+              <span>
+                <Switch checked disabled /> Filter by Is Active
+              </span>
+            }
             style={{ width: "100%" }}
             onChange={(value) =>
               handleFilterChange(
@@ -347,8 +379,12 @@ const ProductsPage: React.FC = () => {
             }
             allowClear
           >
-            <Option value="true">Yes</Option>
-            <Option value="false">No</Option>
+            <Option value="true">
+              <Switch checked disabled style={{ marginRight: 8 }} /> Yes
+            </Option>
+            <Option value="false">
+              <Switch disabled style={{ marginRight: 8 }} /> No
+            </Option>
           </Select>
         </Col>
         <Col span={4}>

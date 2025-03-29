@@ -56,6 +56,25 @@ const fetchFormDataWithAuth = async (url: string, formData: FormData) => {
   return response.json();
 };
 
+const deleteWithAuth = async (url: string) => {
+  const token = useAuthStore.getState().token;
+  const headers = new Headers();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers,
+  });
+
+  if (!response.ok) {
+    handleApiError(response);
+  }
+
+  return response.json();
+};
+
 export const userApi = {
   get: (endpoint: string) => fetchWithAuth(`${USER_API_URL}${endpoint}`),
   post: (endpoint: string, data: any) =>
@@ -145,4 +164,6 @@ export const mediaApi = {
     fetchWithAuth(`${MEDIA_API_URL}${endpoint}`),
   uploadFile: (formData: FormData) =>
     fetchFormDataWithAuth(`${MEDIA_API_URL}/files`, formData),
+  deleteFile: (fileName: string) =>
+    deleteWithAuth(`${MEDIA_API_URL}/files/${fileName}`),
 };

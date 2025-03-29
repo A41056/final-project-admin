@@ -43,6 +43,16 @@ export const uploadFileMutation = () => ({
   },
 });
 
+export const deleteFileMutation = () => ({
+  mutationFn: (fileName: string) => mediaApi.deleteFile(fileName),
+  onSuccess: () => {
+    console.log("File deleted successfully");
+  },
+  onError: (error: any) => {
+    console.error("Failed to delete file:", error);
+  },
+});
+
 export const getAllFileTypes = async (): Promise<FileType[]> => {
   return mediaApi.getFileTypes("/filetypes");
 };

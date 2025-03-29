@@ -5,7 +5,6 @@ import {
   Input,
   Switch,
   Select,
-  Upload,
   Button,
   Space,
   Table,
@@ -14,7 +13,6 @@ import {
   Checkbox,
   type InputRef,
 } from "antd";
-import { UploadOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Category } from "@/types/category";
 import {
   Product,
@@ -28,9 +26,14 @@ import {
 import { toast } from "react-toastify";
 import moment from "moment";
 import { v4 as uuidv4 } from "uuid";
-import { uploadFileMutation } from "@/services/mediaServices";
+import {
+  uploadFileMutation,
+  deleteFileMutation,
+} from "@/services/mediaServices";
 import { useMutation } from "react-query";
 import { useAuthStore } from "@/stores/authStore";
+import ImageUploader from "../ImageUploader"; // Đảm bảo import đúng đường dẫn
+import { DeleteOutlined } from "@ant-design/icons";
 
 const PUBLIC_CLOUDflare_URL =
   import.meta.env.VITE_PUBLIC_CLOUDflare_URL ||
@@ -60,46 +63,10 @@ const VariantInput: React.FC<{
   }) => {
     const inputRef = useRef<InputRef>(null);
 
-    const uploadBoxStyle = {
-      position: "relative" as const,
-      width: "60px",
-      height: "60px",
-      border: "1px dashed #d9d9d9",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      overflow: "hidden",
-      cursor: "pointer" as const,
-    };
-
-    const imageStyle = {
-      width: "100%",
-      height: "100%",
-      objectFit: "cover" as const,
-    };
-
-    const overlayStyle = {
-      position: "absolute" as const,
-      top: 0,
-      left: 0,
-      width: "100%",
-      height: "100%",
-      background: "rgba(0, 0, 0, 0.5)",
-      display: "none",
-      alignItems: "center",
-      justifyContent: "center",
-    };
-
     const handleEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter" && value.value.trim()) {
         onAddNew(type);
         setTimeout(() => inputRef.current?.focus(), 0);
-      }
-    };
-
-    const handleUploadChange = ({ fileList }: { fileList: any[] }) => {
-      if (fileList.length > 0 && fileList[0].originFileObj) {
-        onImageUpload(value.id, fileList[0].originFileObj);
       }
     };
 
@@ -114,37 +81,12 @@ const VariantInput: React.FC<{
           style={{ width: 200 }}
         />
         {isFirstType && (
-          <div style={uploadBoxStyle}>
-            <Upload
-              showUploadList={false}
-              beforeUpload={() => false}
-              onChange={handleUploadChange}
-            >
-              {value.image ? (
-                <img src={value.image} alt={value.value} style={imageStyle} />
-              ) : (
-                <UploadOutlined style={{ fontSize: 20, color: "#999" }} />
-              )}
-            </Upload>
-            {value.image && (
-              <div
-                className="overlay"
-                style={{ ...overlayStyle, display: "flex" }}
-                onMouseEnter={(e) => (e.currentTarget.style.display = "flex")}
-                onMouseLeave={(e) => (e.currentTarget.style.display = "none")}
-              >
-                <Button
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  danger
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onImageRemove(value.id);
-                  }}
-                />
-              </div>
-            )}
-          </div>
+          <ImageUploader
+            url={value.image}
+            onUpload={(file) => onImageUpload(value.id, file)}
+            onRemove={() => onImageRemove(value.id)}
+            disabled={false} // Có thể thêm logic disabled nếu cần
+          />
         )}
         <Button
           icon={<DeleteOutlined />}
@@ -162,7 +104,6 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   onSubmit,
   editingProduct,
   categoriesData,
-  uploadProps,
   generateVariants,
   variantTypes,
   setVariantTypes,
@@ -179,14 +120,39 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   >({});
   const [updatePrice, setUpdatePrice] = useState<number | null>(null);
   const [updateStock, setUpdateStock] = useState<number | null>(null);
+  const [fileList, setFileList] = useState<any[]>([]);
 
   const uploadMutation = useMutation({
     ...uploadFileMutation(),
     onSuccess: (data) => {
-      toast.success("Variant image uploaded successfully");
+      const fileName = data.storageLocation;
+      const fileUrl = `${PUBLIC_CLOUDflare_URL}/${fileName}`;
+      setFileList((prev) => [
+        ...prev,
+        {
+          uid: data.fileId || uuidv4(),
+          name: fileName.split("/").pop() || "image",
+          status: "done",
+          url: fileUrl,
+        },
+      ]);
+      const currentImageFiles = form.getFieldValue("imageFiles") || [];
+      form.setFieldsValue({ imageFiles: [...currentImageFiles, fileUrl] });
+      toast.success("Image uploaded successfully");
     },
     onError: (error: any) => {
-      toast.error("Failed to upload variant image");
+      toast.error("Failed to upload image");
+      console.error(error);
+    },
+  });
+
+  const deleteFileMut = useMutation({
+    ...deleteFileMutation(),
+    onSuccess: () => {
+      toast.success("Image deleted successfully");
+    },
+    onError: (error: any) => {
+      toast.error("Failed to delete image");
       console.error(error);
     },
   });
@@ -225,7 +191,21 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setVariantTypes(types);
       setGeneratedVariants(editingProduct.variants);
       setVariantEnabled(types.length > 0);
-      // Đồng bộ prices từ editingProduct
+      setFileList(
+        editingProduct.imageFiles.map((fileEntry, index) => {
+          const isFullUrl = fileEntry.includes(PUBLIC_CLOUDflare_URL);
+          const fileName = isFullUrl ? fileEntry.split("/").pop() : fileEntry;
+          const url = isFullUrl
+            ? fileEntry
+            : `${PUBLIC_CLOUDflare_URL}/${fileEntry}`;
+          return {
+            uid: `${index}`,
+            name: fileName || `image-${index}`,
+            status: "done",
+            url,
+          };
+        })
+      );
       const prices: Record<string, { price: number; stockCount: number }> = {};
       editingProduct.variants.forEach((variant) => {
         const key = variant.properties.map((p) => p.value).join(" ");
@@ -240,6 +220,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setVariantTypes([]);
       setGeneratedVariants([]);
       setVariantEnabled(false);
+      setFileList([]);
     }
   }, [editingProduct, form, setVariantTypes]);
 
@@ -318,6 +299,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const handleImageUpload = useCallback(
     async (id: string, file: File) => {
+      console.log("handleImageUpload called with id:", id, "file:", file); // Debug log
       const fileTypes = JSON.parse(localStorage.getItem("fileTypes") || "[]");
       const fileType = fileTypes.find(
         (ft: any) => ft.identifier === "ImageProduct"
@@ -329,27 +311,32 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         useAuthStore.getState().user?.id ||
         "550e8400-e29b-41d4-a716-446655440000";
 
-      await uploadMutation.mutateAsync(
-        { file, fileTypeId, userId },
-        {
-          onSuccess: (data) => {
-            const fileName = data.storageLocation;
-            const imageUrl = `${PUBLIC_CLOUDflare_URL}/${fileName}`;
-            setVariantTypes((prev) =>
-              prev.map((t) => ({
-                ...t,
-                values: t.values.map((v) =>
-                  v.id === id ? { ...v, image: imageUrl } : v
-                ),
-              }))
-            );
-          },
-          onError: (error: any) => {
-            toast.error("Failed to upload variant image");
-            console.error(error);
-          },
-        }
-      );
+      try {
+        await uploadMutation.mutateAsync(
+          { file, fileTypeId, userId },
+          {
+            onSuccess: (data) => {
+              console.log("Upload success:", data); // Debug log
+              const fileName = data.storageLocation;
+              const imageUrl = `${PUBLIC_CLOUDflare_URL}/${fileName}`;
+              setVariantTypes((prev) =>
+                prev.map((t) => ({
+                  ...t,
+                  values: t.values.map((v) =>
+                    v.id === id ? { ...v, image: imageUrl } : v
+                  ),
+                }))
+              );
+            },
+            onError: (error: any) => {
+              console.error("Upload error:", error); // Debug log
+              toast.error("Failed to upload variant image");
+            },
+          }
+        );
+      } catch (error) {
+        console.error("Upload mutation failed:", error); // Debug log
+      }
     },
     [uploadMutation, setVariantTypes]
   );
@@ -430,17 +417,54 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setFilterValues((prev) => ({ ...prev, [type]: value }));
   };
 
+  const handleProductImageUpload = (file: File) => {
+    const fileTypes = JSON.parse(localStorage.getItem("fileTypes") || "[]");
+    const fileType = fileTypes.find(
+      (ft: any) => ft.identifier === "ImageProduct"
+    );
+    const fileTypeId = fileType
+      ? fileType.id
+      : "a7ff0762-931c-4faf-8ece-e158ea48bd0c";
+    const userId =
+      useAuthStore.getState().user?.id ||
+      "550e8400-e29b-41d4-a716-446655440000";
+
+    uploadMutation.mutate({ file, fileTypeId, userId });
+  };
+
+  const handleRemoveProductImage = (file: any) => {
+    if (!file.url) {
+      const newFileList = fileList.filter((item) => item.uid !== file.uid);
+      setFileList(newFileList);
+      form.setFieldsValue({ imageFiles: newFileList.map((item) => item.url) });
+      return;
+    }
+
+    const isFullUrl = file.url.includes(PUBLIC_CLOUDflare_URL);
+    const fileName = isFullUrl ? file.url.split("/").pop() : file.url;
+
+    if (fileName) {
+      deleteFileMut.mutate(fileName);
+    }
+
+    const newFileList = fileList.filter((item) => item.uid !== file.uid);
+    setFileList(newFileList);
+    form.setFieldsValue({ imageFiles: newFileList.map((item) => item.url) });
+  };
+
   const handleSubmit = useCallback(
     (values: any) => {
       const request: CreateProductRequest = {
         name: values.name,
         categoryIds: values.categoryIds,
         description: values.description || "",
-        imageFiles: values.imageFiles.map(
-          (file: any) => file.response?.fileId || file.url || file.name
+        imageFiles: fileList.map((file) =>
+          file.url.includes(PUBLIC_CLOUDflare_URL)
+            ? file.url
+            : `${PUBLIC_CLOUDflare_URL}/${file.url}`
         ),
         isHot: values.isHot,
-        isActive: values.isActive,
+        isActive: values.isActive !== undefined ? values.isActive : true,
         variants: generatedVariants.map((variant) => ({
           properties: variant.properties,
           price:
@@ -453,7 +477,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       };
       onSubmit(request);
     },
-    [generatedVariants, onSubmit]
+    [generatedVariants, onSubmit, fileList]
   );
 
   const variantColumns = [
@@ -532,13 +556,32 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
           label="Images"
           rules={[
             { required: true, message: "Please upload at least one image" },
+            {
+              validator: (_, value) =>
+                value && value.length <= 5
+                  ? Promise.resolve()
+                  : Promise.reject("You can upload a maximum of 5 images"),
+            },
           ]}
-          valuePropName="fileList"
-          getValueFromEvent={(e) => (Array.isArray(e) ? e : e.fileList)}
         >
-          <Upload {...uploadProps} listType="picture">
-            <Button icon={<UploadOutlined />}>Upload Images</Button>
-          </Upload>
+          <Space wrap>
+            {fileList.map((file) => (
+              <ImageUploader
+                key={file.uid}
+                url={file.url}
+                onUpload={handleProductImageUpload}
+                onRemove={() => handleRemoveProductImage(file)}
+                disabled={uploadMutation.isLoading || deleteFileMut.isLoading} // Disable khi đang xử lý API
+              />
+            ))}
+            {fileList.length < 5 && (
+              <ImageUploader
+                onUpload={handleProductImageUpload}
+                onRemove={() => {}}
+                disabled={uploadMutation.isLoading} // Disable khi đang upload
+              />
+            )}
+          </Space>
         </Form.Item>
         <Form.Item name="isHot" label="Is Hot" valuePropName="checked">
           <Switch />
