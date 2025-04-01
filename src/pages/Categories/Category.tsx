@@ -12,24 +12,20 @@ import {
 import { PlusOutlined } from "@ant-design/icons";
 import { TweenOneGroup, IEndCallback } from "rc-tween-one";
 import { Category, CreateCategoryResponse } from "@/types/category";
-import {
-  createCategoryMutation,
-  deleteCategoryMutation,
-  getCategoriesQuery,
-  updateCategoryMutation,
-} from "@/services/categoryServices"; // Sửa import
+import { catalogApi } from "@/config/api";
 import { toast } from "react-toastify";
 import ConfirmModal from "@/components/ConfirmModal";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 
+interface GetCategoriesResponse {
+  categories: Category[];
+}
+
 const Categories: React.FC = () => {
   const queryClient = useQueryClient();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({
     pageNumber: 1,
     pageSize: 10,
-    total: 0,
   });
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
@@ -42,31 +38,22 @@ const Categories: React.FC = () => {
   const [confirmText, setConfirmText] = useState("");
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
 
-  const fetchCategories = async () => {
-    setLoading(true);
-    try {
-      const response = await getCategoriesQuery({
-        pageNumber: pagination.pageNumber,
-        pageSize: pagination.pageSize,
-      }).queryFn();
-      console.log("Fetched categories:", response.categories);
-      setCategories(response.categories);
-      setPagination((prev) => ({ ...prev, total: response.categories.length }));
-    } catch (error) {
-      toast.error("Failed to load categories");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Fetch categories using useQuery
+  const { data, isLoading, isError } = catalogApi.useGet("/categories", {
+    pageNumber: pagination.pageNumber,
+    pageSize: pagination.pageSize,
+  }) as { data: GetCategoriesResponse; isLoading: boolean; isError: boolean };
 
-  useEffect(() => {
-    fetchCategories();
-  }, [pagination.pageNumber, pagination.pageSize]);
+  const categories = data?.categories || []; // Lấy mảng categories từ data
+
+  // Mutations
+  const createMutation = catalogApi.usePost();
+  const updateMutation = catalogApi.usePut();
+  const deleteMutation = catalogApi.useDelete();
 
   useEffect(() => {
     if (inputVisible && inputRef.current) {
       inputRef.current.focus();
-      console.log("Input focused");
     }
   }, [inputVisible]);
 
@@ -84,25 +71,20 @@ const Categories: React.FC = () => {
   const handleSubmit = async (values: { name: string; isActive: boolean }) => {
     try {
       if (editingCategory) {
-        const updatedCategory = await updateCategoryMutation().mutationFn({
-          id: editingCategory.id,
+        await updateMutation.mutateAsync({
+          endpoint: `/categories/${editingCategory.id}`,
           data: values,
         });
-        setCategories(
-          categories.map((cat) =>
-            cat.id === updatedCategory.id ? updatedCategory : cat
-          )
-        );
         toast.success("Category updated successfully");
       } else {
-        const newCategory = await createCategoryMutation().mutationFn({
-          names: [values.name],
-          isActive: values.isActive,
+        await createMutation.mutateAsync({
+          endpoint: "/categories",
+          data: { names: [values.name], isActive: values.isActive },
         });
-        await fetchCategories();
         toast.success("Category created successfully");
       }
       setIsModalVisible(false);
+      queryClient.invalidateQueries({ queryKey: ["catalog"] });
     } catch (error) {
       toast.error("Failed to save category");
     }
@@ -110,28 +92,18 @@ const Categories: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteCategoryMutation().mutationFn(id);
-      setCategories(categories.filter((cat) => cat.id !== id));
+      await deleteMutation.mutateAsync(`/categories/${id}`);
       toast.success("Category deleted successfully");
     } catch (error: any) {
-      if (error.response) {
-        const errorMessage =
-          error.response.data.message ||
-          error.response.data.detail ||
-          "An unknown error occurred";
-        toast.error(`Failed to delete category: ${errorMessage}`);
-      } else {
-        toast.error("Failed to delete category: Network error");
-      }
+      toast.error("Failed to delete category: Network error");
     }
   };
 
   const showConfirmDelete = (id: string) => {
-    console.log("Showing confirm delete for ID:", id);
     setConfirmText(
       `Are you sure you want to delete the category "${
         categories.find((cat) => cat.id === id)?.name
-      }"? This action cannot be undo.`
+      }"? This action cannot be undone.`
     );
     setConfirmAction(() => async () => {
       await handleDelete(id);
@@ -141,7 +113,6 @@ const Categories: React.FC = () => {
   };
 
   const showConfirmCloseInput = () => {
-    console.log("Showing confirm close input");
     setConfirmText(
       "You have unsaved changes in the input. Are you sure you want to close without submitting?"
     );
@@ -154,7 +125,6 @@ const Categories: React.FC = () => {
   };
 
   const handleCancelConfirm = () => {
-    console.log("Cancel confirm");
     setConfirmVisible(false);
   };
 
@@ -163,12 +133,10 @@ const Categories: React.FC = () => {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log("Input changed:", e.target.value);
     setInputValue(e.target.value);
   };
 
   const handleInputConfirm = async () => {
-    console.log("Confirm triggered with value:", inputValue);
     if (!inputValue.trim()) {
       toast.error("Please enter at least one category name");
       setInputVisible(false);
@@ -183,45 +151,27 @@ const Categories: React.FC = () => {
     const uniqueNewNames = [...new Set(newCategoryNames)];
 
     try {
-      console.log("Calling createCategory with:", {
-        names: uniqueNewNames,
-        isActive: true,
-      });
-      const result: CreateCategoryResponse =
-        await createCategoryMutation().mutationFn({
-          names: uniqueNewNames,
-          isActive: true,
-        });
+      const result = (await createMutation.mutateAsync({
+        endpoint: "/categories",
+        data: { names: uniqueNewNames, isActive: true },
+      })) as CreateCategoryResponse;
 
-      await fetchCategories();
-
-      const createdCount = result.createdIds.length;
-      const duplicateCount = result.duplicates.length;
+      const createdCount = result.createdIds?.length || uniqueNewNames.length;
+      const duplicateCount = result.duplicates?.length || 0;
 
       if (createdCount > 0) {
-        toast.success(
-          `Added ${createdCount} new categories: ${uniqueNewNames
-            .filter((name) => !result.duplicates.includes(name))
-            .join(", ")}`
-        );
+        toast.success(`Added ${createdCount} new categories`);
       }
       if (duplicateCount > 0) {
         toast.warning(
-          `Skipped ${duplicateCount} duplicate categories: ${result.duplicates.join(
+          `Skipped ${duplicateCount} duplicate categories: ${result.duplicates?.join(
             ", "
           )}`
         );
       }
+      queryClient.invalidateQueries({ queryKey: ["catalog"] });
     } catch (error: any) {
-      if (error.response) {
-        const errorMessage =
-          error.response.data.message ||
-          error.response.data.detail ||
-          "An unknown error occurred";
-        toast.error(`Failed to add categories: ${errorMessage}`);
-      } else {
-        toast.error("Failed to add categories: Network error");
-      }
+      toast.error("Failed to add categories: Network error");
     }
 
     setInputVisible(false);
@@ -293,7 +243,6 @@ const Categories: React.FC = () => {
             width: "100%",
           }}
           onEnd={(e: IEndCallback) => {
-            console.log("onEnd triggered:", e.type, e.target);
             if (e.type === "appear" || e.type === "enter") {
               if (e.target) {
                 if (Array.isArray(e.target)) {
@@ -311,7 +260,13 @@ const Categories: React.FC = () => {
             }
           }}
         >
-          {loading ? <p>Loading...</p> : categories.map(forMap)}
+          {isLoading ? (
+            <p>Loading...</p>
+          ) : isError ? (
+            <p>Failed to load categories</p>
+          ) : (
+            categories.map(forMap)
+          )}
         </TweenOneGroup>
       </div>
 
@@ -323,10 +278,7 @@ const Categories: React.FC = () => {
           style={{ width: 200 }}
           value={inputValue}
           onChange={handleInputChange}
-          onPressEnter={(e) => {
-            console.log("Enter pressed");
-            handleInputConfirm();
-          }}
+          onPressEnter={handleInputConfirm}
           onBlur={handleInputBlur}
           placeholder="Enter categories, separated by commas"
         />
@@ -340,9 +292,9 @@ const Categories: React.FC = () => {
         <Pagination
           current={pagination.pageNumber}
           pageSize={pagination.pageSize}
-          total={pagination.total}
+          total={categories.length} // Cập nhật nếu API trả về total
           onChange={(page, pageSize) =>
-            setPagination({ ...pagination, pageNumber: page, pageSize })
+            setPagination({ pageNumber: page, pageSize })
           }
         />
       </div>
@@ -352,6 +304,9 @@ const Categories: React.FC = () => {
         visible={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
         onOk={() => form.submit()}
+        confirmLoading={
+          editingCategory ? updateMutation.isLoading : createMutation.isLoading
+        }
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item

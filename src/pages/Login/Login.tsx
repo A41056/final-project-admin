@@ -3,21 +3,29 @@ import { Button, Form, Input, Card } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { userApi } from "@/config/api";
 
 const Login: React.FC = () => {
   const [form] = Form.useForm();
   const { login } = useAuth();
   const navigate = useNavigate();
+  const loginMutation = userApi.useLogin();
 
   const handleSubmit = async (values: { email: string; password: string }) => {
     try {
-      await login({
+      const response = await loginMutation.mutateAsync({
         email: values.email,
         password: values.password,
       });
+      await login({ email: values.email, password: values.password });
       navigate("/");
     } catch (error) {
-      alert("Login failed");
+      form.setFields([
+        {
+          name: "password",
+          errors: ["Login failed. Please check your credentials."],
+        },
+      ]);
     }
   };
 
@@ -68,6 +76,8 @@ const Login: React.FC = () => {
                 htmlType="submit"
                 size="large"
                 block
+                loading={loginMutation.isLoading}
+                disabled={loginMutation.isLoading}
                 className="bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-lg py-6"
               >
                 Login

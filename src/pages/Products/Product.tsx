@@ -20,14 +20,10 @@ import {
   CloseOutlined,
 } from "@ant-design/icons";
 import { toast } from "react-toastify";
-import {
-  getProductsQuery,
-  createProductMutation,
-  updateProductMutation,
-  deleteProductMutation,
-} from "@/services/productServices";
-import { getCategoriesQuery } from "@/services/categoryServices";
-import { uploadFileMutation } from "@/services/mediaServices";
+import { catalogApi, mediaApi } from "@/config/api"; // Sử dụng api.ts
+import { useAuthStore } from "@/stores/authStore";
+import ProductFormModal from "@/components/ProductFormModal";
+import moment from "moment";
 import {
   Product,
   CreateProductRequest,
@@ -38,9 +34,6 @@ import {
 } from "@/types/product";
 import { Category } from "@/types/category";
 import { useQuery, useMutation, useQueryClient } from "react-query";
-import { useAuthStore } from "@/stores/authStore";
-import ProductFormModal from "@/components/ProductFormModal";
-import moment from "moment";
 
 const PUBLIC_CLOUDflare_URL =
   import.meta.env.VITE_PUBLIC_CLOUDflare_URL ||
@@ -67,73 +60,28 @@ const ProductsPage: React.FC = () => {
   const [fileList, setFileList] = useState<any[]>([]);
   const [variantTypes, setVariantTypes] = useState<VariantType[]>([]);
 
+  // Fetch products using catalogApi
   const {
     data: productsData,
     isLoading: productsLoading,
-    error: productsError,
-  } = useQuery({
-    ...getProductsQuery({
-      ...filters,
-      pageNumber: currentPage,
-      pageSize,
-    }),
-    onError: (error: any) => handleError(error, "fetch products"),
+    isError: productsError,
+  } = catalogApi.useGet("/products", {
+    ...filters,
+    pageNumber: currentPage,
+    pageSize,
   });
 
-  const { data: categoriesData, error: categoriesError } = useQuery({
-    ...getCategoriesQuery({ pageSize: 100 }),
-    onError: (error: any) => handleError(error, "fetch categories"),
-  });
+  // Fetch categories using catalogApi
+  const { data: categoriesData, isError: categoriesError } = catalogApi.useGet(
+    "/categories",
+    { pageSize: 100 }
+  );
 
-  const createMutation = useMutation({
-    ...createProductMutation(),
-    onSuccess: () => {
-      toast.success("Product added successfully");
-      setIsModalVisible(false);
-      queryClient.invalidateQueries(["products"]);
-    },
-    onError: (error: any) => handleError(error, "add product"),
-  });
-
-  const updateMutation = useMutation({
-    ...updateProductMutation(),
-    onSuccess: () => {
-      toast.success("Product updated successfully");
-      setIsModalVisible(false);
-      queryClient.invalidateQueries(["products"]);
-    },
-    onError: (error: any) => handleError(error, "update product"),
-  });
-
-  const deleteMutation = useMutation({
-    ...deleteProductMutation(),
-    onSuccess: () => {
-      toast.success("Product deleted successfully");
-      queryClient.invalidateQueries(["products"]);
-    },
-    onError: (error: any) => handleError(error, "delete product"),
-  });
-
-  const uploadMutation = useMutation({
-    ...uploadFileMutation(),
-    onSuccess: (data, variables) => {
-      const fileName = data.storageLocation;
-      const fileUrl = `${PUBLIC_CLOUDflare_URL}/${fileName}`;
-      const currentImageFiles = form.getFieldValue("imageFiles") || [];
-      form.setFieldsValue({ imageFiles: [...currentImageFiles, fileUrl] });
-      setFileList((prev) => [
-        ...prev,
-        {
-          uid: variables.file.name,
-          name: variables.file.name,
-          status: "done",
-          url: fileUrl,
-        },
-      ]);
-      toast.success("Image uploaded successfully");
-    },
-    onError: (error: any) => handleError(error, "upload image"),
-  });
+  // Mutations
+  const createMutation = catalogApi.usePost();
+  const updateMutation = catalogApi.usePut();
+  const deleteMutation = catalogApi.useDelete();
+  const uploadMutation = mediaApi.useUploadFile();
 
   const [form] = Form.useForm();
 
@@ -157,16 +105,43 @@ const ProductsPage: React.FC = () => {
 
   const handleSubmit = (values: CreateProductRequest) => {
     if (editingProduct) {
-      updateMutation.mutate({ id: editingProduct.id, data: values });
+      updateMutation.mutate(
+        { endpoint: `/products/${editingProduct.id}`, data: values },
+        {
+          onSuccess: () => {
+            toast.success("Product updated successfully");
+            setIsModalVisible(false);
+            queryClient.invalidateQueries({ queryKey: ["catalog"] });
+          },
+          onError: (error: any) => handleError(error, "update product"),
+        }
+      );
     } else {
-      createMutation.mutate(values);
+      createMutation.mutate(
+        { endpoint: "/products", data: values },
+        {
+          onSuccess: () => {
+            toast.success("Product added successfully");
+            setIsModalVisible(false);
+            queryClient.invalidateQueries({ queryKey: ["catalog"] });
+          },
+          onError: (error: any) => handleError(error, "add product"),
+        }
+      );
     }
   };
 
   const handleDelete = (id: string) => {
     Modal.confirm({
       title: "Are you sure you want to delete this product?",
-      onOk: () => deleteMutation.mutate(id),
+      onOk: () =>
+        deleteMutation.mutate(`/products/${id}`, {
+          onSuccess: () => {
+            toast.success("Product deleted successfully");
+            queryClient.invalidateQueries({ queryKey: ["catalog"] });
+          },
+          onError: (error: any) => handleError(error, "delete product"),
+        }),
     });
   };
 
@@ -179,16 +154,29 @@ const ProductsPage: React.FC = () => {
     const userId =
       useAuthStore.getState().user?.id ||
       "550e8400-e29b-41d4-a716-446655440000";
-    const fileTypes = JSON.parse(localStorage.getItem("fileTypes") || "[]");
-    const fileType = fileTypes.find(
-      (ft: any) => ft.identifier === "ImageProduct"
-    );
-    const fileTypeId = fileType
-      ? fileType.id
-      : "a7ff0762-931c-4faf-8ece-e158ea48bd0c";
+    const fileTypeId = "a7ff0762-931c-4faf-8ece-e158ea48bd0c"; // Giả định ImageProduct
     const productId = editingProduct?.id;
 
-    uploadMutation.mutate({ file, fileTypeId, userId, productId });
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("fileTypeId", fileTypeId);
+    formData.append("userId", userId);
+    if (productId) formData.append("productId", productId);
+
+    uploadMutation.mutate(formData, {
+      onSuccess: (data) => {
+        const fileName = data.storageLocation;
+        const fileUrl = `${PUBLIC_CLOUDflare_URL}/${fileName}`;
+        const currentImageFiles = form.getFieldValue("imageFiles") || [];
+        form.setFieldsValue({ imageFiles: [...currentImageFiles, fileUrl] });
+        setFileList((prev) => [
+          ...prev,
+          { uid: file.name, name: file.name, status: "done", url: fileUrl },
+        ]);
+        toast.success("Image uploaded successfully");
+      },
+      onError: (error: any) => handleError(error, "upload image"),
+    });
     return false;
   };
 
@@ -214,13 +202,7 @@ const ProductsPage: React.FC = () => {
       remainingTypes: string[]
     ): ProductVariant[] => {
       if (remainingTypes.length === 0) {
-        return [
-          {
-            properties: current,
-            price: 0,
-            stockCount: 0,
-          },
-        ];
+        return [{ properties: current, price: 0, stockCount: 0 }];
       }
 
       const type = remainingTypes[0];
@@ -270,7 +252,7 @@ const ProductsPage: React.FC = () => {
           )}
         </span>
       ),
-      align: "center" as const, // Ép kiểu thành literal "center"
+      align: "center" as const,
     },
     {
       title: "Is Active",
@@ -287,7 +269,7 @@ const ProductsPage: React.FC = () => {
           }}
         />
       ),
-      align: "center" as const, // Ép kiểu thành literal "center"
+      align: "center" as const,
     },
     {
       title: "Created",

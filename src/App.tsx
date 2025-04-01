@@ -9,14 +9,14 @@ import { Layout } from "antd";
 import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import Footer from "./components/Footer";
-import Login from "./pages/Login";
+import Login from "./pages/Login/Login";
 import Dashboard from "./pages/Dashboard";
-import Products from "./pages/Products";
+import Products from "./pages/Products/Product";
 import Orders from "./pages/Orders";
 import Customers from "./pages/Customers";
 import Settings from "./pages/Settings";
 import { useAuthStore } from "./stores/authStore";
-import Categories from "./pages/Categories";
+import Categories from "./pages/Categories/Category";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 

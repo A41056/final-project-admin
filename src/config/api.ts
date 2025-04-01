@@ -1,4 +1,5 @@
 import { useAuthStore } from "@/stores/authStore";
+import { useQuery, useMutation, useQueryClient } from "react-query";
 
 const USER_API_URL = import.meta.env.USER_API_URL || "http://localhost:6006";
 const CATALOG_API_URL =
@@ -24,15 +25,8 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
-
-  if (!response.ok) {
-    handleApiError(response);
-  }
-
+  const response = await fetch(url, { ...options, headers });
+  if (!response.ok) handleApiError(response);
   return response.json();
 };
 
@@ -49,10 +43,7 @@ const fetchFormDataWithAuth = async (url: string, formData: FormData) => {
     headers,
   });
 
-  if (!response.ok) {
-    handleApiError(response);
-  }
-
+  if (!response.ok) handleApiError(response);
   return response.json();
 };
 
@@ -68,102 +59,230 @@ const deleteWithAuth = async (url: string) => {
     headers,
   });
 
-  if (!response.ok) {
-    handleApiError(response);
-  }
-
+  if (!response.ok) handleApiError(response);
   return response.json();
 };
 
+// User API
 export const userApi = {
-  get: (endpoint: string) => fetchWithAuth(`${USER_API_URL}${endpoint}`),
-  post: (endpoint: string, data: any) =>
-    fetchWithAuth(`${USER_API_URL}${endpoint}`, {
-      method: "POST",
-      body: JSON.stringify(data),
+  useGet: (endpoint: string) =>
+    useQuery({
+      queryKey: ["user", endpoint],
+      queryFn: () => fetchWithAuth(`${USER_API_URL}${endpoint}`),
     }),
-  put: (endpoint: string, data: any) =>
-    fetchWithAuth(`${USER_API_URL}${endpoint}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
-  delete: (endpoint: string) =>
-    fetchWithAuth(`${USER_API_URL}${endpoint}`, {
-      method: "DELETE",
-    }),
-};
 
-export const catalogApi = {
-  get: (endpoint: string, params?: Record<string, any>) => {
-    const url = new URL(`${CATALOG_API_URL}${endpoint}`);
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-          value.forEach((item) => url.searchParams.append(key, item));
-        } else if (value !== undefined && value !== null) {
-          url.searchParams.append(key, value.toString());
-        }
-      });
-    }
-    return fetchWithAuth(url.toString());
+  usePost: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: ({ endpoint, data }: { endpoint: string; data: any }) =>
+        fetchWithAuth(`${USER_API_URL}${endpoint}`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["user"] }),
+    });
   },
-  post: (endpoint: string, data: any) =>
-    fetchWithAuth(`${CATALOG_API_URL}${endpoint}`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-  put: (endpoint: string, data: any) =>
-    fetchWithAuth(`${CATALOG_API_URL}${endpoint}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
-  delete: (endpoint: string) =>
-    fetchWithAuth(`${CATALOG_API_URL}${endpoint}`, {
-      method: "DELETE",
+
+  usePut: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: ({ endpoint, data }: { endpoint: string; data: any }) =>
+        fetchWithAuth(`${USER_API_URL}${endpoint}`, {
+          method: "PUT",
+          body: JSON.stringify(data),
+        }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["user"] }),
+    });
+  },
+
+  useDelete: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: (endpoint: string) =>
+        fetchWithAuth(`${USER_API_URL}${endpoint}`, {
+          method: "DELETE",
+        }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["user"] }),
+    });
+  },
+
+  useLogin: (email: string, password: string) =>
+    useMutation({
+      mutationFn: ({ email, password }: { email: string; password: string }) =>
+        fetchWithAuth(`${USER_API_URL}/login`, {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        }),
     }),
 };
 
+// Catalog API
+export const catalogApi = {
+  useGet: (endpoint: string, params?: Record<string, any>) =>
+    useQuery({
+      queryKey: ["catalog", endpoint, params],
+      queryFn: () => {
+        const url = new URL(`${CATALOG_API_URL}${endpoint}`);
+        if (params) {
+          Object.entries(params).forEach(([key, value]) => {
+            if (Array.isArray(value)) {
+              value.forEach((item) => url.searchParams.append(key, item));
+            } else if (value !== undefined && value !== null) {
+              url.searchParams.append(key, value.toString());
+            }
+          });
+        }
+        return fetchWithAuth(url.toString());
+      },
+    }),
+
+  usePost: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: ({ endpoint, data }: { endpoint: string; data: any }) =>
+        fetchWithAuth(`${CATALOG_API_URL}${endpoint}`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["catalog"] }),
+    });
+  },
+
+  usePut: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: ({ endpoint, data }: { endpoint: string; data: any }) =>
+        fetchWithAuth(`${CATALOG_API_URL}${endpoint}`, {
+          method: "PUT",
+          body: JSON.stringify(data),
+        }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["catalog"] }),
+    });
+  },
+
+  useDelete: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: (endpoint: string) =>
+        fetchWithAuth(`${CATALOG_API_URL}${endpoint}`, {
+          method: "DELETE",
+        }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["catalog"] }),
+    });
+  },
+};
+
+// Order API
 export const orderApi = {
-  get: (endpoint: string) => fetchWithAuth(`${ORDER_API_URL}${endpoint}`),
-  post: (endpoint: string, data: any) =>
-    fetchWithAuth(`${ORDER_API_URL}${endpoint}`, {
-      method: "POST",
-      body: JSON.stringify(data),
+  useGet: (endpoint: string) =>
+    useQuery({
+      queryKey: ["order", endpoint],
+      queryFn: () => fetchWithAuth(`${ORDER_API_URL}${endpoint}`),
     }),
-  put: (endpoint: string, data: any) =>
-    fetchWithAuth(`${ORDER_API_URL}${endpoint}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
-  delete: (endpoint: string) =>
-    fetchWithAuth(`${ORDER_API_URL}${endpoint}`, {
-      method: "DELETE",
-    }),
+
+  usePost: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: ({ endpoint, data }: { endpoint: string; data: any }) =>
+        fetchWithAuth(`${ORDER_API_URL}${endpoint}`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["order"] }),
+    });
+  },
+
+  usePut: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: ({ endpoint, data }: { endpoint: string; data: any }) =>
+        fetchWithAuth(`${ORDER_API_URL}${endpoint}`, {
+          method: "PUT",
+          body: JSON.stringify(data),
+        }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["order"] }),
+    });
+  },
+
+  useDelete: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: (endpoint: string) =>
+        fetchWithAuth(`${ORDER_API_URL}${endpoint}`, {
+          method: "DELETE",
+        }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["order"] }),
+    });
+  },
 };
 
+// Basket API
 export const basketApi = {
-  get: (endpoint: string) => fetchWithAuth(`${BASKET_API_URL}${endpoint}`),
-  post: (endpoint: string, data: any) =>
-    fetchWithAuth(`${BASKET_API_URL}${endpoint}`, {
-      method: "POST",
-      body: JSON.stringify(data),
+  useGet: (endpoint: string) =>
+    useQuery({
+      queryKey: ["basket", endpoint],
+      queryFn: () => fetchWithAuth(`${BASKET_API_URL}${endpoint}`),
     }),
-  put: (endpoint: string, data: any) =>
-    fetchWithAuth(`${BASKET_API_URL}${endpoint}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
-  delete: (endpoint: string) =>
-    fetchWithAuth(`${BASKET_API_URL}${endpoint}`, {
-      method: "DELETE",
-    }),
+
+  usePost: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: ({ endpoint, data }: { endpoint: string; data: any }) =>
+        fetchWithAuth(`${BASKET_API_URL}${endpoint}`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["basket"] }),
+    });
+  },
+
+  usePut: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: ({ endpoint, data }: { endpoint: string; data: any }) =>
+        fetchWithAuth(`${BASKET_API_URL}${endpoint}`, {
+          method: "PUT",
+          body: JSON.stringify(data),
+        }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["basket"] }),
+    });
+  },
+
+  useDelete: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: (endpoint: string) =>
+        fetchWithAuth(`${BASKET_API_URL}${endpoint}`, {
+          method: "DELETE",
+        }),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["basket"] }),
+    });
+  },
 };
 
+// Media API
 export const mediaApi = {
-  getFileTypes: (endpoint: string) =>
-    fetchWithAuth(`${MEDIA_API_URL}${endpoint}`),
-  uploadFile: (formData: FormData) =>
-    fetchFormDataWithAuth(`${MEDIA_API_URL}/files`, formData),
-  deleteFile: (fileName: string) =>
-    deleteWithAuth(`${MEDIA_API_URL}/files/${fileName}`),
+  useGetFileTypes: (endpoint: string) =>
+    useQuery({
+      queryKey: ["media", endpoint],
+      queryFn: () => fetchWithAuth(`${MEDIA_API_URL}${endpoint}`),
+    }),
+
+  useUploadFile: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: (formData: FormData) =>
+        fetchFormDataWithAuth(`${MEDIA_API_URL}/files`, formData),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["media"] }),
+    });
+  },
+
+  useDeleteFile: () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: (fileName: string) =>
+        deleteWithAuth(`${MEDIA_API_URL}/files/${fileName}`),
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["media"] }),
+    });
+  },
 };

@@ -9,16 +9,18 @@ interface LoginResponse {
 
 export const useAuth = () => {
   const { login, logout } = useAuthStore();
+  const loginMutation = userApi.useLogin();
 
   const loginUser = async (credentials: {
     email: string;
     password: string;
   }) => {
     try {
-      const response = (await userApi.post(
-        "/Login",
-        credentials
-      )) as LoginResponse;
+      const response = (await loginMutation.mutateAsync({
+        email: credentials.email,
+        password: credentials.password,
+      })) as LoginResponse;
+
       const { token, user } = response;
       login(token, user);
       return response;
