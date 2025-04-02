@@ -1,5 +1,10 @@
-import { mediaApi } from "@/config/api";
-import { useQuery } from "react-query";
+import {
+  fetchFormDataWithAuth,
+  deleteWithAuth,
+  MEDIA_API_URL,
+  fetchWithAuth,
+} from "@/config/api"; // Import trực tiếp các hàm fetch
+import { useQuery, useMutation } from "react-query";
 
 export interface UploadFileResponse {
   fileId: string;
@@ -16,58 +21,53 @@ export interface FileType {
   maxSize: number;
 }
 
-export const uploadFileMutation = () => ({
-  mutationFn: ({
-    file,
-    fileTypeId,
-    userId,
-    productId,
-  }: {
-    file: File;
-    fileTypeId: string;
-    userId: string;
-    productId?: string;
-  }) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("fileTypeId", fileTypeId);
-    formData.append("userId", userId);
-    formData.append("fileName", file.name);
-    formData.append("displayName", file.name);
-    formData.append("imageOrder", "1");
-    formData.append("isActive", "true");
-    if (productId) {
-      formData.append("productId", productId);
+// Mutation để upload file
+export const useUploadFileMutation = () => {
+  return useMutation<
+    UploadFileResponse,
+    Error,
+    {
+      file: File;
+      fileTypeId: string;
+      userId: string;
+      productId?: string;
     }
-    return mediaApi.uploadFile(formData) as Promise<UploadFileResponse>;
-  },
-});
-
-export const deleteFileMutation = () => ({
-  mutationFn: (fileName: string) => mediaApi.deleteFile(fileName),
-  onSuccess: () => {
-    console.log("File deleted successfully");
-  },
-  onError: (error: any) => {
-    console.error("Failed to delete file:", error);
-  },
-});
-
-export const getAllFileTypes = async (): Promise<FileType[]> => {
-  return mediaApi.getFileTypes("/filetypes");
+  >({
+    mutationFn: ({ file, fileTypeId, userId, productId }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("fileTypeId", fileTypeId);
+      formData.append("userId", userId);
+      formData.append("fileName", file.name);
+      formData.append("displayName", file.name);
+      formData.append("imageOrder", "1");
+      formData.append("isActive", "true");
+      if (productId) {
+        formData.append("productId", productId);
+      }
+      return fetchFormDataWithAuth(`${MEDIA_API_URL}/files`, formData); // Gọi trực tiếp hàm fetch
+    },
+  });
 };
 
+// Mutation để delete file
+export const useDeleteFileMutation = () => {
+  return useMutation<void, Error, string>({
+    mutationFn: (fileName: string) =>
+      deleteWithAuth(`${MEDIA_API_URL}/files/${fileName}`), // Gọi trực tiếp hàm fetch
+    onSuccess: () => {
+      console.log("File deleted successfully");
+    },
+    onError: (error: any) => {
+      console.error("Failed to delete file:", error);
+    },
+  });
+};
+
+// Hook để lấy tất cả file types
 export const useGetAllFileTypes = () => {
   return useQuery<FileType[], Error>({
     queryKey: ["fileTypes"],
-    queryFn: getAllFileTypes,
-    staleTime: Infinity,
-    cacheTime: Infinity,
-    onSuccess: (data) => {
-      localStorage.setItem("fileTypes", JSON.stringify(data));
-    },
-    onError: (error) => {
-      console.error("Failed to fetch file types:", error);
-    },
+    queryFn: () => fetchWithAuth(`${MEDIA_API_URL}/filetypes`),
   });
 };

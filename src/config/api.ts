@@ -1,15 +1,19 @@
+import { FileType, UploadFileResponse } from "@/services/mediaServices";
 import { useAuthStore } from "@/stores/authStore";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 
-const USER_API_URL = import.meta.env.USER_API_URL || "http://localhost:6006";
-const CATALOG_API_URL =
+export const USER_API_URL =
+  import.meta.env.USER_API_URL || "http://localhost:6006";
+export const CATALOG_API_URL =
   import.meta.env.CATALOG_API_URL || "http://localhost:6009";
-const ORDER_API_URL = import.meta.env.ORDER_API_URL || "http://localhost:6003";
-const BASKET_API_URL =
+export const ORDER_API_URL =
+  import.meta.env.ORDER_API_URL || "http://localhost:6003";
+export const BASKET_API_URL =
   import.meta.env.BASKET_API_URL || "http://localhost:6001";
-const MEDIA_API_URL = import.meta.env.MEDIA_API_URL || "http://localhost:6010";
+export const MEDIA_API_URL =
+  import.meta.env.MEDIA_API_URL || "http://localhost:6010";
 
-const handleApiError = (response: Response) => {
+export const handleApiError = (response: Response) => {
   if (response.status === 401) {
     useAuthStore.getState().logout();
     window.location.href = "/login";
@@ -17,7 +21,7 @@ const handleApiError = (response: Response) => {
   throw new Error(`API error: ${response.status} - ${response.statusText}`);
 };
 
-const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+export const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   const token = useAuthStore.getState().token;
   const headers = new Headers(options.headers || {});
   headers.set("Content-Type", "application/json");
@@ -30,7 +34,10 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
   return response.json();
 };
 
-const fetchFormDataWithAuth = async (url: string, formData: FormData) => {
+export const fetchFormDataWithAuth = async (
+  url: string,
+  formData: FormData
+) => {
   const token = useAuthStore.getState().token;
   const headers = new Headers();
   if (token) {
@@ -47,7 +54,7 @@ const fetchFormDataWithAuth = async (url: string, formData: FormData) => {
   return response.json();
 };
 
-const deleteWithAuth = async (url: string) => {
+export const deleteWithAuth = async (url: string) => {
   const token = useAuthStore.getState().token;
   const headers = new Headers();
   if (token) {
@@ -106,7 +113,7 @@ export const userApi = {
     });
   },
 
-  useLogin: (email: string, password: string) =>
+  useLogin: () =>
     useMutation({
       mutationFn: ({ email, password }: { email: string; password: string }) =>
         fetchWithAuth(`${USER_API_URL}/login`, {
@@ -263,14 +270,14 @@ export const basketApi = {
 // Media API
 export const mediaApi = {
   useGetFileTypes: (endpoint: string) =>
-    useQuery({
+    useQuery<FileType[], Error>({
       queryKey: ["media", endpoint],
       queryFn: () => fetchWithAuth(`${MEDIA_API_URL}${endpoint}`),
     }),
 
   useUploadFile: () => {
     const queryClient = useQueryClient();
-    return useMutation({
+    return useMutation<UploadFileResponse, Error, FormData>({
       mutationFn: (formData: FormData) =>
         fetchFormDataWithAuth(`${MEDIA_API_URL}/files`, formData),
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ["media"] }),
@@ -279,7 +286,7 @@ export const mediaApi = {
 
   useDeleteFile: () => {
     const queryClient = useQueryClient();
-    return useMutation({
+    return useMutation<void, Error, string>({
       mutationFn: (fileName: string) =>
         deleteWithAuth(`${MEDIA_API_URL}/files/${fileName}`),
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ["media"] }),

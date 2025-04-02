@@ -26,14 +26,14 @@ import {
 import { toast } from "react-toastify";
 import moment from "moment";
 import { v4 as uuidv4 } from "uuid";
-import {
-  uploadFileMutation,
-  deleteFileMutation,
-} from "@/services/mediaServices";
 import { useMutation } from "react-query";
 import { useAuthStore } from "@/stores/authStore";
-import ImageUploader from "../ImageUploader"; // Đảm bảo import đúng đường dẫn
+import ImageUploader from "../ImageUploader";
 import { DeleteOutlined } from "@ant-design/icons";
+import {
+  useDeleteFileMutation,
+  useUploadFileMutation,
+} from "@/services/mediaServices";
 
 const PUBLIC_CLOUDflare_URL =
   import.meta.env.VITE_PUBLIC_CLOUDflare_URL ||
@@ -122,40 +122,8 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [updateStock, setUpdateStock] = useState<number | null>(null);
   const [fileList, setFileList] = useState<any[]>([]);
 
-  const uploadMutation = useMutation({
-    ...uploadFileMutation(),
-    onSuccess: (data) => {
-      const fileName = data.storageLocation;
-      const fileUrl = `${PUBLIC_CLOUDflare_URL}/${fileName}`;
-      setFileList((prev) => [
-        ...prev,
-        {
-          uid: data.fileId || uuidv4(),
-          name: fileName.split("/").pop() || "image",
-          status: "done",
-          url: fileUrl,
-        },
-      ]);
-      const currentImageFiles = form.getFieldValue("imageFiles") || [];
-      form.setFieldsValue({ imageFiles: [...currentImageFiles, fileUrl] });
-      toast.success("Image uploaded successfully");
-    },
-    onError: (error: any) => {
-      toast.error("Failed to upload image");
-      console.error(error);
-    },
-  });
-
-  const deleteFileMut = useMutation({
-    ...deleteFileMutation(),
-    onSuccess: () => {
-      toast.success("Image deleted successfully");
-    },
-    onError: (error: any) => {
-      toast.error("Failed to delete image");
-      console.error(error);
-    },
-  });
+  const uploadMutation = useUploadFileMutation();
+  const deleteFileMutation = useDeleteFileMutation();
 
   useEffect(() => {
     if (editingProduct) {
@@ -444,7 +412,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const fileName = isFullUrl ? file.url.split("/").pop() : file.url;
 
     if (fileName) {
-      deleteFileMut.mutate(fileName);
+      deleteFileMutation.mutate(fileName);
     }
 
     const newFileList = fileList.filter((item) => item.uid !== file.uid);
@@ -571,7 +539,9 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 url={file.url}
                 onUpload={handleProductImageUpload}
                 onRemove={() => handleRemoveProductImage(file)}
-                disabled={uploadMutation.isLoading || deleteFileMut.isLoading} // Disable khi đang xử lý API
+                disabled={
+                  uploadMutation.isLoading || deleteFileMutation.isLoading
+                } // Disable khi đang xử lý API
               />
             ))}
             {fileList.length < 5 && (
