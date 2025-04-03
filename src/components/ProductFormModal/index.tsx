@@ -85,7 +85,7 @@ const VariantInput: React.FC<{
             url={value.image}
             onUpload={(file) => onImageUpload(value.id, file)}
             onRemove={() => onImageRemove(value.id)}
-            disabled={false} // Có thể thêm logic disabled nếu cần
+            disabled={false}
           />
         )}
         <Button
@@ -267,7 +267,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const handleImageUpload = useCallback(
     async (id: string, file: File) => {
-      console.log("handleImageUpload called with id:", id, "file:", file); // Debug log
+      console.log("handleImageUpload called with id:", id, "file:", file);
       const fileTypes = JSON.parse(localStorage.getItem("fileTypes") || "[]");
       const fileType = fileTypes.find(
         (ft: any) => ft.identifier === "ImageProduct"
@@ -284,7 +284,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
           { file, fileTypeId, userId },
           {
             onSuccess: (data) => {
-              console.log("Upload success:", data); // Debug log
+              console.log("Upload success:", data);
               const fileName = data.storageLocation;
               const imageUrl = `${PUBLIC_CLOUDflare_URL}/${fileName}`;
               setVariantTypes((prev) =>
@@ -297,13 +297,13 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               );
             },
             onError: (error: any) => {
-              console.error("Upload error:", error); // Debug log
+              console.error("Upload error:", error);
               toast.error("Failed to upload variant image");
             },
           }
         );
       } catch (error) {
-        console.error("Upload mutation failed:", error); // Debug log
+        console.error("Upload mutation failed:", error);
       }
     },
     [uploadMutation, setVariantTypes]
@@ -397,7 +397,28 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       useAuthStore.getState().user?.id ||
       "550e8400-e29b-41d4-a716-446655440000";
 
-    uploadMutation.mutate({ file, fileTypeId, userId });
+    uploadMutation.mutate(
+      { file, fileTypeId, userId },
+      {
+        onSuccess: (data) => {
+          const fileName = data.storageLocation;
+          const url = `${PUBLIC_CLOUDflare_URL}/${fileName}`;
+          const newFile = {
+            uid: uuidv4(),
+            name: file.name,
+            status: "done",
+            url,
+          };
+          setFileList((prev) => [...prev, newFile]);
+          form.setFieldsValue({
+            imageFiles: [...fileList, newFile].map((f) => f.url),
+          });
+        },
+        onError: () => {
+          toast.error("Failed to upload product image");
+        },
+      }
+    );
   };
 
   const handleRemoveProductImage = (file: any) => {
@@ -412,41 +433,63 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const fileName = isFullUrl ? file.url.split("/").pop() : file.url;
 
     if (fileName) {
-      deleteFileMutation.mutate(fileName);
+      deleteFileMutation.mutate(fileName, {
+        onSuccess: () => {
+          const newFileList = fileList.filter((item) => item.uid !== file.uid);
+          setFileList(newFileList);
+          form.setFieldsValue({
+            imageFiles: newFileList.map((item) => item.url),
+          });
+        },
+        onError: () => {
+          toast.error("Failed to delete product image");
+        },
+      });
     }
-
-    const newFileList = fileList.filter((item) => item.uid !== file.uid);
-    setFileList(newFileList);
-    form.setFieldsValue({ imageFiles: newFileList.map((item) => item.url) });
   };
 
   const handleSubmit = useCallback(
     (values: any) => {
+      console.log("Form values:", values); // Debug log
       const request: CreateProductRequest = {
         name: values.name,
-        categoryIds: values.categoryIds,
+        categoryIds: values.categoryIds || [],
         description: values.description || "",
         imageFiles: fileList.map((file) =>
           file.url.includes(PUBLIC_CLOUDflare_URL)
             ? file.url
             : `${PUBLIC_CLOUDflare_URL}/${file.url}`
         ),
-        isHot: values.isHot,
+        isHot: values.isHot || false,
         isActive: values.isActive !== undefined ? values.isActive : true,
         variants: generatedVariants.map((variant) => ({
           properties: variant.properties,
           price:
-            values.prices[variant.properties.map((p) => p.value).join(" ")]
+            values.prices?.[variant.properties.map((p) => p.value).join(" ")]
               ?.price || 0,
           stockCount:
-            values.prices[variant.properties.map((p) => p.value).join(" ")]
+            values.prices?.[variant.properties.map((p) => p.value).join(" ")]
               ?.stockCount || 0,
         })),
       };
+      console.log("Submit request:", request); // Debug log
       onSubmit(request);
     },
     [generatedVariants, onSubmit, fileList]
   );
+
+  const handleOk = () => {
+    console.log("OK button clicked"); // Debug log
+    form
+      .validateFields()
+      .then((values) => {
+        handleSubmit(values);
+      })
+      .catch((errorInfo) => {
+        console.error("Validation failed:", errorInfo); // Debug log
+        toast.error("Please fill in all required fields correctly");
+      });
+  };
 
   const variantColumns = [
     {
@@ -505,7 +548,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       title={editingProduct ? "Edit Product" : "Add Product"}
       open={visible}
       onCancel={onCancel}
-      onOk={() => form.submit()}
+      onOk={handleOk} // Thay vì form.submit()
       width={1000}
     >
       <Form form={form} layout="vertical" onFinish={handleSubmit}>
@@ -541,14 +584,14 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 onRemove={() => handleRemoveProductImage(file)}
                 disabled={
                   uploadMutation.isLoading || deleteFileMutation.isLoading
-                } // Disable khi đang xử lý API
+                }
               />
             ))}
             {fileList.length < 5 && (
               <ImageUploader
                 onUpload={handleProductImageUpload}
                 onRemove={() => {}}
-                disabled={uploadMutation.isLoading} // Disable khi đang upload
+                disabled={uploadMutation.isLoading}
               />
             )}
           </Space>
