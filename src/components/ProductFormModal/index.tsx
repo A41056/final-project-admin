@@ -34,6 +34,8 @@ import {
   useDeleteFileMutation,
   useUploadFileMutation,
 } from "@/services/mediaServices";
+import { log } from "node:console";
+import { FileTypeIdentifier } from "@/types/fileType";
 
 const PUBLIC_CLOUDflare_URL =
   import.meta.env.VITE_PUBLIC_CLOUDflare_URL ||
@@ -270,14 +272,15 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       console.log("handleImageUpload called with id:", id, "file:", file);
       const fileTypes = JSON.parse(localStorage.getItem("fileTypes") || "[]");
       const fileType = fileTypes.find(
-        (ft: any) => ft.identifier === "ImageProduct"
+        (ft: any) => ft.identifier === FileTypeIdentifier.ImageProduct
       );
+      console.log(fileType);
       const fileTypeId = fileType
         ? fileType.id
-        : "a7ff0762-931c-4faf-8ece-e158ea48bd0c";
+        : "";
       const userId =
         useAuthStore.getState().user?.id ||
-        "550e8400-e29b-41d4-a716-446655440000";
+        "";
 
       try {
         await uploadMutation.mutateAsync(
@@ -387,15 +390,20 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const handleProductImageUpload = (file: File) => {
     const fileTypes = JSON.parse(localStorage.getItem("fileTypes") || "[]");
+    console.log(`FileTypes: ${fileTypes}`);
+
     const fileType = fileTypes.find(
-      (ft: any) => ft.identifier === "ImageProduct"
+      (ft: any) => ft.identifier === FileTypeIdentifier.ImageProduct
     );
+    console.log(fileType);
+
     const fileTypeId = fileType
       ? fileType.id
-      : "a7ff0762-931c-4faf-8ece-e158ea48bd0c";
+      : "";
+      
     const userId =
       useAuthStore.getState().user?.id ||
-      "550e8400-e29b-41d4-a716-446655440000";
+      "";
 
     uploadMutation.mutate(
       { file, fileTypeId, userId },

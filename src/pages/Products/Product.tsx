@@ -34,6 +34,7 @@ import {
 } from "@/types/product";
 import { Category } from "@/types/category";
 import { useQuery, useMutation, useQueryClient } from "react-query";
+import { FileTypeIdentifier } from "@/types/fileType";
 
 const PUBLIC_CLOUDflare_URL =
   import.meta.env.VITE_PUBLIC_CLOUDflare_URL ||
@@ -153,8 +154,17 @@ const ProductsPage: React.FC = () => {
   const handleUpload = (file: File) => {
     const userId =
       useAuthStore.getState().user?.id ||
-      "550e8400-e29b-41d4-a716-446655440000";
-    const fileTypeId = "a7ff0762-931c-4faf-8ece-e158ea48bd0c"; // Giả định ImageProduct
+      "";
+    const fileTypes = JSON.parse(localStorage.getItem("fileTypes") || "[]");
+    console.log(fileTypes);
+    
+    const fileType = fileTypes.find(
+      (ft: any) => ft.identifier === FileTypeIdentifier.ImageProduct
+    );
+    console.log(fileType);
+    const fileTypeId = fileType
+      ? fileType.id
+      : "";
     const productId = editingProduct?.id;
 
     const formData = new FormData();
