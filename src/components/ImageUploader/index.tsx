@@ -19,21 +19,24 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   const uploadBoxStyle = {
     position: "relative" as const,
-    width: "60px",
-    height: "60px",
+    width: "100px", // Tăng kích thước để rõ hơn
+    height: "100px",
     border: "1px dashed #d9d9d9",
+    borderRadius: "6px", // Thêm borderRadius
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    backgroundColor: "#fafafa",
+    backgroundColor: "#ffffff", // Đổi nền thành trắng
     cursor: disabled ? "not-allowed" : "pointer",
+    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)", // Thêm bóng nhẹ
   };
 
   const imageStyle = {
     width: "100%",
     height: "100%",
     objectFit: "cover" as const,
+    borderRadius: "6px", // Đồng bộ borderRadius
   };
 
   const overlayStyle = {
@@ -47,28 +50,28 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     alignItems: "center",
     justifyContent: "center",
     gap: "8px",
+    transition: "opacity 0.2s ease-in-out", // Thêm transition cho overlay
+    opacity: 0,
   };
 
   const handleUploadChange = (info: any) => {
-    console.log("Upload change triggered:", info);
-    const file = info.file; // Lấy file trực tiếp từ info.file
+    const file = info.file;
     if (file) {
-      console.log("File selected:", file);
-      onUpload(file); // Gọi onUpload với file
-    } else {
-      console.log("No file found in upload event");
+      onUpload(file);
     }
   };
 
   const handleMouseEnter = () => {
     if (!disabled && overlayRef.current) {
       overlayRef.current.style.display = "flex";
+      overlayRef.current.style.opacity = "1"; // Hiển thị mượt mà
     }
   };
 
   const handleMouseLeave = () => {
     if (!disabled && overlayRef.current) {
       overlayRef.current.style.display = "none";
+      overlayRef.current.style.opacity = "0";
     }
   };
 
@@ -95,24 +98,21 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       {url ? (
         <img src={url} alt="Uploaded" style={imageStyle} />
       ) : (
-        <UploadOutlined style={{ fontSize: 20, color: "#999" }} />
+        <UploadOutlined style={{ fontSize: 24, color: "#999" }} /> // Tăng kích thước icon
       )}
       <div ref={overlayRef} style={overlayStyle} className="overlay">
         <Upload
           showUploadList={false}
-          beforeUpload={() => {
-            console.log("Before upload triggered");
-            return false; // Ngăn upload mặc định
-          }}
+          beforeUpload={() => false}
           onChange={handleUploadChange}
           disabled={disabled}
-          accept="image/*" // Giới hạn chỉ chọn file ảnh
+          accept="image/*"
         >
           <Button
             size="small"
             icon={<UploadOutlined />}
             disabled={disabled}
-            style={{ background: "white" }}
+            style={{ background: "white", borderRadius: "4px" }}
             aria-label="Upload image"
           />
         </Upload>
@@ -122,6 +122,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           danger
           onClick={onRemove}
           disabled={!url || disabled}
+          style={{ borderRadius: "4px" }}
           aria-label="Delete image"
         />
       </div>

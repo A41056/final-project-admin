@@ -1,6 +1,11 @@
 import { FileType, UploadFileResponse } from "@/services/mediaServices";
 import { useAuthStore } from "@/stores/authStore";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  UseQueryOptions,
+} from "react-query";
 
 export const USER_API_URL =
   import.meta.env.USER_API_URL || "http://localhost:6006";
@@ -125,7 +130,11 @@ export const userApi = {
 
 // Catalog API
 export const catalogApi = {
-  useGet: (endpoint: string, params?: Record<string, any>) =>
+  useGet: (
+    endpoint: string,
+    params?: Record<string, any>,
+    options?: Partial<UseQueryOptions<any, unknown, any>>
+  ) =>
     useQuery({
       queryKey: ["catalog", endpoint, params],
       queryFn: () => {
@@ -141,6 +150,7 @@ export const catalogApi = {
         }
         return fetchWithAuth(url.toString());
       },
+      ...options,
     }),
 
   usePost: () => {

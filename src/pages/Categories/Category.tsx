@@ -8,6 +8,8 @@ import {
   Tag,
   theme,
   InputRef,
+  TreeSelect,
+  Tooltip,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { TweenOneGroup, IEndCallback } from "rc-tween-one";
@@ -21,6 +23,18 @@ interface GetCategoriesResponse {
   categories: Category[];
 }
 
+interface GetCategoryPathResponse {
+  path: Category[];
+}
+
+interface TreeNode {
+  title: string;
+  value: string;
+  key: string;
+  children?: TreeNode[];
+  disabled?: boolean;
+}
+
 const Categories: React.FC = () => {
   const queryClient = useQueryClient();
   const [pagination, setPagination] = useState({
@@ -32,6 +46,9 @@ const Categories: React.FC = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [inputVisible, setInputVisible] = useState(false);
   const [inputValue, setInputValue] = useState("");
+  const [inputParentId, setInputParentId] = useState<string | undefined>(
+    undefined
+  );
   const inputRef = useRef<InputRef | null>(null);
   const { token } = theme.useToken();
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -44,12 +61,64 @@ const Categories: React.FC = () => {
     pageSize: pagination.pageSize,
   }) as { data: GetCategoriesResponse; isLoading: boolean; isError: boolean };
 
-  const categories = data?.categories || []; // Lấy mảng categories từ data
+  const categories = data?.categories || [];
 
   // Mutations
   const createMutation = catalogApi.usePost();
   const updateMutation = catalogApi.usePut();
   const deleteMutation = catalogApi.useDelete();
+
+  // Build tree data for TreeSelect
+  const buildTreeData = (
+    categories: Category[],
+    editingId?: string
+  ): TreeNode[] => {
+    const treeData: TreeNode[] = [];
+    const categoryMap = new Map<string, TreeNode>();
+    const descendants = new Set<string>();
+
+    // Tìm tất cả danh mục con của editingId
+    if (editingId) {
+      const findDescendants = (id: string) => {
+        categories
+          .filter((cat) => cat.parentId === id)
+          .forEach((cat) => {
+            descendants.add(cat.id);
+            findDescendants(cat.id);
+          });
+      };
+      findDescendants(editingId);
+    }
+
+    // Create nodes
+    categories.forEach((cat) => {
+      categoryMap.set(cat.id, {
+        title: cat.name,
+        value: cat.id,
+        key: cat.id,
+        children: [],
+        disabled: editingId === cat.id || descendants.has(cat.id),
+      });
+    });
+
+    // Build tree structure
+    categories.forEach((cat) => {
+      if (cat.parentId && categoryMap.has(cat.parentId)) {
+        const parentNode = categoryMap.get(cat.parentId)!;
+        parentNode.children = parentNode.children || [];
+        parentNode.children.push(categoryMap.get(cat.id)!);
+      } else {
+        treeData.push(categoryMap.get(cat.id)!);
+      }
+    });
+
+    return treeData;
+  };
+
+  const treeData = React.useMemo(
+    () => buildTreeData(categories, editingCategory?.id),
+    [categories, editingCategory?.id]
+  );
 
   useEffect(() => {
     if (inputVisible && inputRef.current) {
@@ -60,7 +129,12 @@ const Categories: React.FC = () => {
   const showModal = (category?: Category) => {
     if (category) {
       setEditingCategory(category);
-      form.setFieldsValue(category);
+      form.setFieldsValue({
+        name: category.name,
+        slug: category.slug,
+        parentId: category.parentId,
+        isActive: category.isActive,
+      });
     } else {
       setEditingCategory(null);
       form.resetFields();
@@ -68,25 +142,42 @@ const Categories: React.FC = () => {
     setIsModalVisible(true);
   };
 
-  const handleSubmit = async (values: { name: string; isActive: boolean }) => {
+  const handleSubmit = async (values: {
+    name: string;
+    slug?: string;
+    parentId?: string;
+    isActive: boolean;
+  }) => {
     try {
       if (editingCategory) {
         await updateMutation.mutateAsync({
           endpoint: `/categories/${editingCategory.id}`,
-          data: values,
+          data: {
+            id: editingCategory.id,
+            name: values.name,
+            slug: values.slug,
+            parentId: values.parentId,
+            isActive: values.isActive,
+          },
         });
         toast.success("Category updated successfully");
       } else {
         await createMutation.mutateAsync({
           endpoint: "/categories",
-          data: { names: [values.name], isActive: values.isActive },
+          data: {
+            names: values.name,
+            isActive: values.isActive,
+            parentId: values.parentId,
+          },
         });
         toast.success("Category created successfully");
       }
       setIsModalVisible(false);
       queryClient.invalidateQueries({ queryKey: ["catalog"] });
-    } catch (error) {
-      toast.error("Failed to save category");
+    } catch (error: any) {
+      toast.error(
+        `Failed to save category: ${error.message || "Network error"}`
+      );
     }
   };
 
@@ -95,7 +186,9 @@ const Categories: React.FC = () => {
       await deleteMutation.mutateAsync(`/categories/${id}`);
       toast.success("Category deleted successfully");
     } catch (error: any) {
-      toast.error("Failed to delete category: Network error");
+      toast.error(
+        `Failed to delete category: ${error.message || "Network error"}`
+      );
     }
   };
 
@@ -119,6 +212,7 @@ const Categories: React.FC = () => {
     setConfirmAction(() => () => {
       setInputVisible(false);
       setInputValue("");
+      setInputParentId(undefined);
       setConfirmVisible(false);
     });
     setConfirmVisible(true);
@@ -141,22 +235,17 @@ const Categories: React.FC = () => {
       toast.error("Please enter at least one category name");
       setInputVisible(false);
       setInputValue("");
+      setInputParentId(undefined);
       return;
     }
-
-    const newCategoryNames = inputValue
-      .split(",")
-      .map((name) => name.trim())
-      .filter((name) => name);
-    const uniqueNewNames = [...new Set(newCategoryNames)];
 
     try {
       const result = (await createMutation.mutateAsync({
         endpoint: "/categories",
-        data: { names: uniqueNewNames, isActive: true },
+        data: { names: inputValue, isActive: true, parentId: inputParentId },
       })) as CreateCategoryResponse;
 
-      const createdCount = result.createdIds?.length || uniqueNewNames.length;
+      const createdCount = result.createdIds?.length || 0;
       const duplicateCount = result.duplicates?.length || 0;
 
       if (createdCount > 0) {
@@ -171,50 +260,70 @@ const Categories: React.FC = () => {
       }
       queryClient.invalidateQueries({ queryKey: ["catalog"] });
     } catch (error: any) {
-      toast.error("Failed to add categories: Network error");
+      toast.error(
+        `Failed to add categories: ${error.message || "Network error"}`
+      );
     }
 
     setInputVisible(false);
     setInputValue("");
+    setInputParentId(undefined);
   };
 
   const handleInputBlur = () => {
-    if (inputValue.trim()) {
+    if (inputValue.trim() || inputParentId) {
       showConfirmCloseInput();
     } else {
       setInputVisible(false);
     }
   };
 
-  const forMap = (category: Category) => (
-    <span key={category.id} style={{ display: "block", margin: "12px" }}>
-      <Tag
-        closable
-        onClose={(e) => {
-          e.preventDefault();
-          showConfirmDelete(category.id);
-        }}
-        style={{
-          borderColor: category.isActive ? "#1890ff" : "#d9d9d9",
-          backgroundColor: "#f0f0f0",
-          color: "#000000",
-          borderWidth: 1,
-          borderStyle: "solid",
-          padding: "4px 8px",
-        }}
-      >
-        {category.name}
-        <Button
-          type="link"
-          size="small"
-          onClick={() => showModal(category)}
-          style={{ padding: 0, marginLeft: 8 }}
-        >
-          Edit
-        </Button>
-      </Tag>
-    </span>
-  );
+  const forMap = (category: Category) => {
+    const { data: pathCategories, isLoading: pathLoading } = catalogApi.useGet(
+      `/categories/${category.id}/path`,
+      {},
+      {
+        queryKey: ["categoryPath", category.id],
+        select: (data: GetCategoryPathResponse) => data.path as Category[],
+      }
+    );
+
+    const path =
+      pathCategories?.map((cat: Category) => cat.name).join(" > ") ||
+      category.name;
+
+    return (
+      <span key={category.id} style={{ display: "block", margin: "12px" }}>
+        <Tooltip title={path}>
+          <Tag
+            closable
+            onClose={(e) => {
+              e.preventDefault();
+              showConfirmDelete(category.id);
+            }}
+            style={{
+              borderColor: category.isActive ? "#1890ff" : "#d9d9d9",
+              backgroundColor: "#f0f0f0",
+              color: "#000000",
+              borderWidth: 1,
+              borderStyle: "solid",
+              padding: "4px 8px",
+            }}
+          >
+            {pathLoading ? "Loading..." : path}
+            <Button
+              type="link"
+              size="small"
+              onClick={() => showModal(category)}
+              style={{ padding: 0, marginLeft: 8 }}
+            >
+              Edit
+            </Button>
+          </Tag>
+        </Tooltip>
+      </span>
+    );
+  };
 
   const tagPlusStyle = {
     background: token.colorBgContainer,
@@ -271,17 +380,29 @@ const Categories: React.FC = () => {
       </div>
 
       {inputVisible ? (
-        <Input
-          ref={inputRef}
-          type="text"
-          size="small"
-          style={{ width: 200 }}
-          value={inputValue}
-          onChange={handleInputChange}
-          onPressEnter={handleInputConfirm}
-          onBlur={handleInputBlur}
-          placeholder="Enter categories, separated by commas"
-        />
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <Input
+            ref={inputRef}
+            type="text"
+            size="small"
+            style={{ width: 200 }}
+            value={inputValue}
+            onChange={handleInputChange}
+            onPressEnter={handleInputConfirm}
+            onBlur={handleInputBlur}
+            placeholder="Enter categories, separated by commas"
+          />
+          <TreeSelect
+            style={{ width: 200 }}
+            value={inputParentId}
+            onChange={setInputParentId}
+            treeData={treeData}
+            placeholder="Select parent category"
+            allowClear
+            showSearch
+            treeNodeFilterProp="title"
+          />
+        </div>
       ) : (
         <Tag onClick={showInput} style={tagPlusStyle} className="mt-4 mb-6">
           <PlusOutlined /> New Category
@@ -292,7 +413,7 @@ const Categories: React.FC = () => {
         <Pagination
           current={pagination.pageNumber}
           pageSize={pagination.pageSize}
-          total={categories.length} // Cập nhật nếu API trả về total
+          total={categories.length} // Cần cập nhật nếu API trả về totalItems
           onChange={(page, pageSize) =>
             setPagination({ pageNumber: page, pageSize })
           }
@@ -315,6 +436,33 @@ const Categories: React.FC = () => {
             rules={[{ required: true, message: "Please enter category name" }]}
           >
             <Input />
+          </Form.Item>
+          <Form.Item
+            name="slug"
+            label="Slug"
+            rules={[
+              { required: false },
+              {
+                pattern: /^[a-z0-9-]+$/,
+                message:
+                  "Slug can only contain lowercase letters, numbers, and hyphens",
+              },
+            ]}
+          >
+            <Input placeholder="Leave blank to auto-generate" />
+          </Form.Item>
+          <Form.Item
+            name="parentId"
+            label="Parent Category"
+            rules={[{ required: false }]}
+          >
+            <TreeSelect
+              showSearch
+              treeNodeFilterProp="title"
+              treeData={treeData}
+              placeholder="Select a parent category"
+              allowClear
+            />
           </Form.Item>
           <Form.Item name="isActive" label="Active" valuePropName="checked">
             <Input type="checkbox" />

@@ -22,7 +22,7 @@ import {
 import { toast } from "react-toastify";
 import { catalogApi, mediaApi } from "@/config/api"; // Sử dụng api.ts
 import { useAuthStore } from "@/stores/authStore";
-import ProductFormModal from "@/components/ProductFormModal";
+import ProductFormModal from "@/components/ProductFormModal/ProductFormModal";
 import moment from "moment";
 import {
   Product,
@@ -152,19 +152,15 @@ const ProductsPage: React.FC = () => {
   };
 
   const handleUpload = (file: File) => {
-    const userId =
-      useAuthStore.getState().user?.id ||
-      "";
+    const userId = useAuthStore.getState().user?.id || "";
     const fileTypes = JSON.parse(localStorage.getItem("fileTypes") || "[]");
     console.log(fileTypes);
-    
+
     const fileType = fileTypes.find(
       (ft: any) => ft.identifier === FileTypeIdentifier.ImageProduct
     );
     console.log(fileType);
-    const fileTypeId = fileType
-      ? fileType.id
-      : "";
+    const fileTypeId = fileType ? fileType.id : "";
     const productId = editingProduct?.id;
 
     const formData = new FormData();
