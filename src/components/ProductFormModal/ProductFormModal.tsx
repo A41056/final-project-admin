@@ -177,15 +177,15 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   }, [apiCategoriesData]);
 
   const createCategoryMutation = useMutation(
-    (data: { name: string; isActive: boolean }) =>
+    (data: { name: string; slugs: string; isActive: boolean }) =>
       fetch(`${PUBLIC_CLOUDflare_URL}/api/categories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ names: [data.name], isActive: data.isActive }),
+        body: JSON.stringify({ names: [data.name],slugs: [data.slugs], isActive: data.isActive }),
       }).then((res) => res.json()),
     {
       onSuccess: () => {
-        queryClient.invalidateQueries(["catalog"]); // Làm mới danh sách category
+        queryClient.invalidateQueries(["catalog"]);
       },
     }
   );
@@ -259,14 +259,15 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   // Xử lý thêm category
   const handleAddCategory = useCallback(
-    (values: { name: string }) => {
+    (values: { name: string, slug: string }) => {
       createCategoryMutation.mutate(
-        { name: values.name, isActive: true },
+        { name: values.name, isActive: true, slugs: values.slug },
         {
           onSuccess: (data: any) => {
             const newCategory: Category = {
               id: data.createdIds[0],
               name: values.name,
+              slug: values.slug,
               isActive: true,
               created: Date.now().toString(),
               modified: Date.now().toString(),
@@ -295,6 +296,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     if (editingProduct) {
       form.setFieldsValue({
         ...editingProduct,
+        tags: editingProduct.tags || [],
         created: moment(editingProduct.created),
       });
       const types: VariantType[] = editingProduct.variants.reduce(
@@ -616,6 +618,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         ),
         isHot: values.isHot || false,
         isActive: values.isActive !== undefined ? values.isActive : true,
+        tags: values.tags || [],
         variants: generatedVariants.map((variant) => ({
           properties: variant.properties,
           price:
@@ -776,6 +779,15 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <Col span={24}>
                 <Form.Item name="description" label="Mô tả">
                   <Input.TextArea rows={4} style={{ borderRadius: 6 }} />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="tags" label="Tags (từ khóa)">
+                  <Select
+                    mode="tags"
+                    style={{ width: "100%", borderRadius: 6 }}
+                    placeholder="Nhập các tags và enter"
+                  />
                 </Form.Item>
               </Col>
               <Col span={24}>
@@ -1063,6 +1075,13 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             name="name"
             label="Tên danh mục"
             rules={[{ required: true, message: "Vui lòng nhập tên danh mục" }]}
+          >
+            <Input style={{ borderRadius: 6 }} />
+          </Form.Item>
+          <Form.Item
+            name="slug"
+            label="Slug"
+            rules={[{ required: true, message: "Vui lòng nhập slug" }]}
           >
             <Input style={{ borderRadius: 6 }} />
           </Form.Item>

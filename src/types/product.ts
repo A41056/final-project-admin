@@ -10,6 +10,7 @@ export interface Product {
   created: string;
   modified: string;
   categoryIds: string[];
+  tags: string[];
   variants: ProductVariant[];
 }
 
@@ -32,6 +33,7 @@ export interface CreateProductRequest {
   isHot: boolean;
   isActive: boolean;
   categoryIds: string[];
+  tags: string[];
   variants: ProductVariant[];
 }
 
@@ -46,6 +48,7 @@ export interface GetProductsRequest {
   categoryIds?: string[];
   isHot?: boolean;
   isActive?: boolean;
+  tags?: string[];
   createdFrom?: string;
   createdTo?: string;
 }
