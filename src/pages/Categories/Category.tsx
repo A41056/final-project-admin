@@ -14,7 +14,7 @@ import {
 import { PlusOutlined } from "@ant-design/icons";
 import { TweenOneGroup, IEndCallback } from "rc-tween-one";
 import { Category, CreateCategoryResponse } from "@/types/category";
-import { catalogApi } from "@/config/api";
+import { CATALOG_API_URL, catalogApi, fetchWithAuth } from "@/config/api";
 import { toast } from "react-toastify";
 import ConfirmModal from "@/components/ConfirmModal";
 import { useQuery, useMutation, useQueryClient } from "react-query";
@@ -278,19 +278,33 @@ const Categories: React.FC = () => {
     }
   };
 
-  const forMap = (category: Category) => {
-    const { data: pathCategories, isLoading: pathLoading } = catalogApi.useGet(
-      `/categories/${category.id}/path`,
-      {},
-      {
-        queryKey: ["categoryPath", category.id],
-        select: (data: GetCategoryPathResponse) => data.path as Category[],
-      }
-    );
+  const [categoryPaths, setCategoryPaths] = useState<Record<string, string>>(
+    {}
+  );
 
-    const path =
-      pathCategories?.map((cat: Category) => cat.name).join(" > ") ||
-      category.name;
+  useEffect(() => {
+    const fetchPaths = async () => {
+      const results: Record<string, string> = {};
+      for (const cat of categories) {
+        try {
+          const res = await fetchWithAuth(
+            `${CATALOG_API_URL}/categories/${cat.id}/path`
+          );
+          const names =
+            res.path?.map((p: Category) => p.name).join(" > ") || cat.name;
+          results[cat.id] = names;
+        } catch (error) {
+          results[cat.id] = cat.name; // fallback
+        }
+      }
+      setCategoryPaths(results);
+    };
+
+    if (categories.length > 0) fetchPaths();
+  }, [categories]);
+
+  const forMap = (category: Category) => {
+    const path = categoryPaths[category.id] || category.name;
 
     return (
       <span key={category.id} style={{ display: "block", margin: "12px" }}>
@@ -310,7 +324,7 @@ const Categories: React.FC = () => {
               padding: "4px 8px",
             }}
           >
-            {pathLoading ? "Loading..." : path}
+            {path}
             <Button
               type="link"
               size="small"

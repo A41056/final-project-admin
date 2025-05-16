@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -19,6 +19,11 @@ import { useAuthStore } from "./stores/authStore";
 import Categories from "./pages/Categories/Category";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import {
+  startNotificationHub,
+  stopNotificationHub,
+} from "./services/notificationService";
+import OrderDetail from "./pages/Orders/OrderDetail/OrderDetail";
 
 const { Content } = Layout;
 
@@ -32,14 +37,27 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 };
 
 function App() {
+  const { isAuthenticated } = useAuthStore();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      startNotificationHub();
+    } else {
+      stopNotificationHub();
+    }
+    return () => {
+      stopNotificationHub();
+    };
+  }, [isAuthenticated]);
+
   return (
     <Router>
       <ToastContainer
-        position="top-right" // Vị trí mặc định
-        autoClose={3000} // Tự đóng sau 3 giây
-        hideProgressBar={false} // Hiển thị thanh tiến trình
-        closeOnClick // Đóng khi nhấp
-        pauseOnHover // Tạm dừng khi di chuột qua
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        closeOnClick
+        pauseOnHover
       />
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -64,6 +82,10 @@ function App() {
                       <Route path="/" element={<Dashboard />} />
                       <Route path="/products" element={<Products />} />
                       <Route path="/orders" element={<Orders />} />
+                      <Route
+                        path="/orders/:orderId"
+                        element={<OrderDetail />}
+                      />
                       <Route path="/customers" element={<Customers />} />
                       <Route path="/categories" element={<Categories />} />
                       <Route path="/settings" element={<Settings />} />
