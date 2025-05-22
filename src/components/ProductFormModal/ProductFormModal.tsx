@@ -630,7 +630,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         })),
       };
       onSubmit(request);
-      localStorage.removeItem("productFormData"); // Xóa sau khi submit
+      localStorage.removeItem("productFormData");
     },
     [generatedVariants, onSubmit, fileList]
   );
