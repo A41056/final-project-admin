@@ -1,6 +1,7 @@
 import React from 'react';
 import { Row, Col, Card, Statistic, Typography, Spin } from 'antd';
 import { catalogApi, orderApi } from '@/config/api';
+import OrderStatsChart from '@/components/OrderStatsChart/OrderStatsChart';
 
 const { Title } = Typography;
 
@@ -66,10 +67,7 @@ const Dashboard: React.FC = () => {
             <Col span={24}>
               <Card title="Biểu đồ doanh thu theo ngày (7 ngày)">
                 <div style={{ height: 300 }}>
-                  {/* Bạn có thể thay thế phần này bằng biểu đồ thực */}
-                  <pre style={{ fontSize: 12 }}>
-                    {JSON.stringify(orderStats?.chart, null, 2)}
-                  </pre>
+                  <OrderStatsChart data={orderStats?.chart ?? []} />
                 </div>
               </Card>
             </Col>
