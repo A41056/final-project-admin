@@ -8,7 +8,7 @@ env:
   AWS_REGION: us-east-1                   
   ECR_REGISTRY: 654654461467.dkr.ecr.us-east-1.amazonaws.com
   ECR_REPOSITORY: fe-admin                        
-  ECS_SERVICE: fe-admin-service                    
+  ECS_SERVICE: fe-admin-task-service                    
   ECS_CLUSTER: fe-admin-cluster                    
   ECS_TASK_DEFINITION: .github/ecs/fe-admin-task-def.json  
   CONTAINER_NAME: fe-admin-container                
