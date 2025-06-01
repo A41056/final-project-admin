@@ -1,15 +1,27 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Row, Col, Card, Statistic, Typography, Spin } from 'antd';
 import { catalogApi, orderApi } from '@/config/api';
 import OrderStatsChart from '@/components/OrderStatsChart/OrderStatsChart';
+import { mediaApi } from "@/config/api";
 
 const { Title } = Typography;
 
 const Dashboard: React.FC = () => {
+  const { data: fileTypes, isLoading: loadingFileTypes, error: fileTypesError } = mediaApi.useGetFileTypes("/filetypes");
   const { data: productStats, isLoading: loadingProducts } = catalogApi.useGet("/dashboard/product-stats");
   const { data: orderStats, isLoading: loadingOrders } = orderApi.useGet("/dashboard/order-stats?range=7d");
 
-  const loading = loadingProducts || loadingOrders;
+  const loading = loadingProducts || loadingOrders || loadingFileTypes;
+  
+  useEffect(() => {
+      if (fileTypes && !fileTypesError) {
+        try {
+          localStorage.setItem("fileTypes", JSON.stringify(fileTypes));
+        } catch (e) {
+          console.warn("Failed to save fileTypes to localStorage", e);
+        }
+      }
+    }, [fileTypes, fileTypesError]);
 
   return (
     <div style={{ padding: 24 }}>

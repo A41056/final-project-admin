@@ -17,12 +17,13 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   return (
     <Modal
       title="Confirmation"
-      visible={visible}
+      open={visible}
       onOk={onConfirm}
       onCancel={onCancel}
       okText="Yes"
       cancelText="No"
       okButtonProps={{ danger: true }}
+      centered
     >
       <p>{text}</p>
     </Modal>

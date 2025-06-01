@@ -741,17 +741,12 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </Form.Item>
               </Col>
               <Col span={12}>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                   <Form.Item
                     name="categoryIds"
                     label="Danh mục"
-                    style={{ flex: 1 }}
-                    rules={[
-                      {
-                        required: true,
-                        message: "Vui lòng chọn ít nhất một danh mục",
-                      },
-                    ]}
+                    style={{ flex: 1, marginBottom: 0 }}
+                    rules={[{ required: true, message: "Vui lòng chọn ít nhất một danh mục" }]}
                   >
                     <Select
                       mode="multiple"
@@ -770,7 +765,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   <Button
                     type="primary"
                     onClick={() => setIsCategoryModalOpen(true)}
-                    style={{ alignSelf: "flex-end", borderRadius: 6 }}
+                    style={{ borderRadius: 6 }}
                   >
                     Thêm danh mục
                   </Button>

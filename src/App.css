@@ -44,3 +44,27 @@
 .read-the-docs {
   color: #888;
 }
+
+body.dark-mode .ant-layout-sider-trigger {
+  background: #001529 !important;
+  color: #fff !important;
+  border-top: 1px solid #002140 !important;
+  border-left: 1px solid #002140 !important;
+}
+
+body:not(.dark-mode) .ant-layout-sider-trigger {
+  background: #fff !important;
+  color: #000 !important;
+  border-top: 1px solid #f0f0f0 !important;
+  border-left: 1px solid #f0f0f0 !important;
+}
+
+body.dark-mode .ant-layout-sider-trigger:hover {
+  background: #1890ff !important;
+  color: #fff !important;
+}
+
+body:not(.dark-mode) .ant-layout-sider-trigger:hover {
+  background: #e6f7ff !important;
+  color: #1890ff !important;
+}
