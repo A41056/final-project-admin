@@ -489,6 +489,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   );
 
   const handleGeneratePriceTable = useCallback(() => {
+
     const newVariants = generateVariants(variantTypes);
     setGeneratedVariants(newVariants);
     setFilterValues({});

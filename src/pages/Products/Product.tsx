@@ -7,6 +7,7 @@ import ProductActions from "@/components/Product/ProductActions";
 import ProductTable from "@/components/Product/ProductTable";
 import ProductFormModal from "@/components/Product/ProductFormModal";
 import { Product, VariantType, CreateProductRequest } from "@/types/product";
+import { generateVariants } from "@/utils/generateVariants";
 
 const ProductsPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -130,9 +131,7 @@ const ProductsPage: React.FC = () => {
         uploadProps={{ mutation: uploadMutation }}
         variantTypes={variantTypes}
         setVariantTypes={setVariantTypes}
-        generateVariants={(types: VariantType[]) => {
-          return [];
-        }}
+        generateVariants={generateVariants}
       />
     </div>
   );
