@@ -63,9 +63,6 @@ const Sidebar: React.FC = () => {
         <Menu.Item key="5" icon={<TagsOutlined />}>
           <Link to="/categories">Categories</Link>
         </Menu.Item>
-        <Menu.Item key="6" icon={<SettingOutlined />}>
-          <Link to="/settings">Settings</Link>
-        </Menu.Item>
       </Menu>
     </Sider>
   );
