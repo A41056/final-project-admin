@@ -58,10 +58,10 @@ const Navbar: React.FC = () => {
 
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <Dropdown
-          overlay={<NotificationDropdown onClose={() => setNotiVisible(false)} />}
+          overlay={<NotificationDropdown onClose={() => setNotiVisible(false)} />} // Sử dụng menu thay cho overlay
           trigger={["click"]}
-          visible={notiVisible}
-          onVisibleChange={(flag) => setNotiVisible(flag)}
+          open={notiVisible} // Thay vì visible, dùng open
+          onOpenChange={(flag) => setNotiVisible(flag)} // Thay onVisibleChange bằng onOpenChange
           placement="bottomRight"
           arrow
         >
@@ -72,7 +72,11 @@ const Navbar: React.FC = () => {
           </Badge>
         </Dropdown>
 
-        <Dropdown overlay={userMenu} trigger={["click"]} placement="bottomRight">
+        <Dropdown
+          overlay={userMenu} // Sử dụng menu thay cho overlay
+          trigger={["click"]}
+          placement="bottomRight"
+        >
           <Avatar icon={<UserOutlined />} style={{ cursor: "pointer", color: "inherit" }} />
         </Dropdown>
       </div>
