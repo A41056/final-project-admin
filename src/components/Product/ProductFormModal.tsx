@@ -139,7 +139,9 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     Record<string, string | undefined>
   >({});
   const [updatePrice, setUpdatePrice] = useState<number | null>(null);
-  const [updateDiscountPrice, setUpdateDiscountPrice] = useState<number | null>(null);
+  const [updateDiscountPrice, setUpdateDiscountPrice] = useState<number | null>(
+    null
+  );
   const [updateStock, setUpdateStock] = useState<number | null>(null);
   const [fileList, setFileList] = useState<any[]>([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -182,7 +184,11 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       fetch(`${PUBLIC_CLOUDflare_URL}/api/categories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ names: [data.name],slugs: [data.slugs], isActive: data.isActive }),
+        body: JSON.stringify({
+          names: [data.name],
+          slugs: [data.slugs],
+          isActive: data.isActive,
+        }),
       }).then((res) => res.json()),
     {
       onSuccess: () => {
@@ -260,7 +266,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   // Xử lý thêm category
   const handleAddCategory = useCallback(
-    (values: { name: string, slug: string }) => {
+    (values: { name: string; slug: string }) => {
       createCategoryMutation.mutate(
         { name: values.name, isActive: true, slugs: values.slug },
         {
@@ -490,7 +496,6 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   );
 
   const handleGeneratePriceTable = useCallback(() => {
-
     const newVariants = generateVariants(variantTypes);
     setGeneratedVariants(newVariants);
     setFilterValues({});
@@ -498,7 +503,10 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setUpdateDiscountPrice(null);
     setUpdateStock(null);
     setUpdateAll(false);
-    const prices: Record<string, { price: number; discountPrice: number; stockCount: number }> = {};
+    const prices: Record<
+      string,
+      { price: number; discountPrice: number; stockCount: number }
+    > = {};
     newVariants.forEach((variant) => {
       const key = variant.properties.map((p) => p.value).join(" ");
       prices[key] = {
@@ -511,45 +519,58 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   }, [generateVariants, variantTypes, form]);
 
   const handleUpdatePrices = useCallback(() => {
-  setGeneratedVariants((prev) => {
-    const updatedVariants = prev.map((variant) => {
-      const matchesFilter =
-        updateAll ||
-        Object.entries(filterValues).every(
-          ([type, value]) =>
-            !value ||
-            variant.properties.some(
-              (prop) => prop.type === type && prop.value === value
-            )
-        );
-      if (matchesFilter) {
-        return {
-          ...variant,
-          price: updatePrice !== null ? updatePrice : variant.price,
-          discountPrice: updateDiscountPrice !== null ? updateDiscountPrice : variant.discountPrice,
-          stockCount: updateStock !== null ? updateStock : variant.stockCount,
+    setGeneratedVariants((prev) => {
+      const updatedVariants = prev.map((variant) => {
+        const matchesFilter =
+          updateAll ||
+          Object.entries(filterValues).every(
+            ([type, value]) =>
+              !value ||
+              variant.properties.some(
+                (prop) => prop.type === type && prop.value === value
+              )
+          );
+        if (matchesFilter) {
+          return {
+            ...variant,
+            price: updatePrice !== null ? updatePrice : variant.price,
+            discountPrice:
+              updateDiscountPrice !== null
+                ? updateDiscountPrice
+                : variant.discountPrice,
+            stockCount: updateStock !== null ? updateStock : variant.stockCount,
+          };
+        }
+        return variant;
+      });
+
+      const prices: Record<
+        string,
+        { price: number; discountPrice: number; stockCount: number }
+      > = {};
+      updatedVariants.forEach((variant) => {
+        const key = variant.properties.map((p) => p.value).join(" ");
+        prices[key] = {
+          price: variant.price,
+          discountPrice: variant.discountPrice,
+          stockCount: variant.stockCount,
         };
-      }
-      return variant;
-    });
+      });
 
-    const prices: Record<string, { price: number; discountPrice: number; stockCount: number }> = {};
-    updatedVariants.forEach((variant) => {
-      const key = variant.properties.map((p) => p.value).join(" ");
-      prices[key] = {
-        price: variant.price,
-        discountPrice: variant.discountPrice,
-        stockCount: variant.stockCount,
-      };
-    });
+      form.setFieldsValue({
+        prices,
+      });
 
-    form.setFieldsValue({
-      prices,
+      return updatedVariants;
     });
-
-    return updatedVariants;
-  });
-}, [updateAll, filterValues, updatePrice, updateDiscountPrice, updateStock, form]);
+  }, [
+    updateAll,
+    filterValues,
+    updatePrice,
+    updateDiscountPrice,
+    updateStock,
+    form,
+  ]);
 
   const handleFilterChange = (type: string, value: string | undefined) => {
     setFilterValues((prev) => ({ ...prev, [type]: value }));
@@ -634,14 +655,20 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             values.prices?.[variant.properties.map((p) => p.value).join(" ")]
               ?.price || 0,
           discountPrice:
-            values.discountPrices?.[variant.properties.map((p) => p.value).join(" ")]
-              ?.discountPrice || 0,
+            values.discountPrices?.[
+              variant.properties.map((p) => p.value).join(" ")
+            ]?.discountPrice || 0,
           stockCount:
             values.prices?.[variant.properties.map((p) => p.value).join(" ")]
               ?.stockCount || 0,
         })),
       };
       onSubmit(request);
+      form.resetFields(); // Reset form fields
+      setVariantTypes([]); // Reset variant types
+      setGeneratedVariants([]); // Reset generated variants
+      setVariantEnabled(false); // Reset variant enabled state
+      setFileList([]); // Clear uploaded files
       localStorage.removeItem("productFormData");
     },
     [generatedVariants, onSubmit, fileList]
@@ -663,6 +690,11 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setConfirmVisible(true);
       setConfirmAction("discard");
     } else {
+      setVariantTypes([]);
+      setGeneratedVariants([]);
+      setVariantEnabled(false);
+      setFileList([]);
+      form.resetFields();
       onCancel();
     }
   };
@@ -710,7 +742,11 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       key: "discountPrice",
       render: (_: any, record: ProductVariant) => (
         <Form.Item
-          name={[ "discountPrices", record.properties.map((p) => p.value).join(" "), "discountPrice" ]}
+          name={[
+            "discountPrices",
+            record.properties.map((p) => p.value).join(" "),
+            "discountPrice",
+          ]}
           initialValue={record.discountPrice}
           noStyle
         >
@@ -771,12 +807,19 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </Form.Item>
               </Col>
               <Col span={12}>
-                <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <div
+                  style={{ display: "flex", gap: 8, alignItems: "flex-end" }}
+                >
                   <Form.Item
                     name="categoryIds"
                     label="Danh mục"
                     style={{ flex: 1, marginBottom: 0 }}
-                    rules={[{ required: true, message: "Vui lòng chọn ít nhất một danh mục" }]}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng chọn ít nhất một danh mục",
+                      },
+                    ]}
                   >
                     <Select
                       mode="multiple"
