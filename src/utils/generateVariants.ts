@@ -33,6 +33,7 @@ export function generateVariants(variantTypes: VariantType[]): ProductVariant[] 
   return combinations.map((props) => ({
     properties: props,
     price: 0,
+    discountPrice: 0,
     stockCount: 0,
   }));
 }

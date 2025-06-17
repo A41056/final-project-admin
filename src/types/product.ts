@@ -17,6 +17,7 @@ export interface Product {
 export interface ProductVariant {
   properties: VariantProperty[];
   price: number;
+  discountPrice: number;
   stockCount: number;
 }
 

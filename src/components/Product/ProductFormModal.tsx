@@ -139,6 +139,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     Record<string, string | undefined>
   >({});
   const [updatePrice, setUpdatePrice] = useState<number | null>(null);
+  const [updateDiscountPrice, setUpdateDiscountPrice] = useState<number | null>(null);
   const [updateStock, setUpdateStock] = useState<number | null>(null);
   const [fileList, setFileList] = useState<any[]>([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -494,13 +495,15 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setGeneratedVariants(newVariants);
     setFilterValues({});
     setUpdatePrice(null);
+    setUpdateDiscountPrice(null);
     setUpdateStock(null);
     setUpdateAll(false);
-    const prices: Record<string, { price: number; stockCount: number }> = {};
+    const prices: Record<string, { price: number; discountPrice: number; stockCount: number }> = {};
     newVariants.forEach((variant) => {
       const key = variant.properties.map((p) => p.value).join(" ");
       prices[key] = {
         price: variant.price,
+        discountPrice: variant.discountPrice,
         stockCount: variant.stockCount,
       };
     });
@@ -508,40 +511,45 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   }, [generateVariants, variantTypes, form]);
 
   const handleUpdatePrices = useCallback(() => {
-    setGeneratedVariants((prev) => {
-      const updatedVariants = prev.map((variant) => {
-        const matchesFilter =
-          updateAll ||
-          Object.entries(filterValues).every(
-            ([type, value]) =>
-              !value ||
-              variant.properties.some(
-                (prop) => prop.type === type && prop.value === value
-              )
-          );
-        if (matchesFilter) {
-          return {
-            ...variant,
-            price: updatePrice !== null ? updatePrice : variant.price,
-            stockCount: updateStock !== null ? updateStock : variant.stockCount,
-          };
-        }
-        return variant;
-      });
-
-      const prices: Record<string, { price: number; stockCount: number }> = {};
-      updatedVariants.forEach((variant) => {
-        const key = variant.properties.map((p) => p.value).join(" ");
-        prices[key] = {
-          price: variant.price,
-          stockCount: variant.stockCount,
+  setGeneratedVariants((prev) => {
+    const updatedVariants = prev.map((variant) => {
+      const matchesFilter =
+        updateAll ||
+        Object.entries(filterValues).every(
+          ([type, value]) =>
+            !value ||
+            variant.properties.some(
+              (prop) => prop.type === type && prop.value === value
+            )
+        );
+      if (matchesFilter) {
+        return {
+          ...variant,
+          price: updatePrice !== null ? updatePrice : variant.price,
+          discountPrice: updateDiscountPrice !== null ? updateDiscountPrice : variant.discountPrice,
+          stockCount: updateStock !== null ? updateStock : variant.stockCount,
         };
-      });
-      form.setFieldsValue({ prices });
-
-      return updatedVariants;
+      }
+      return variant;
     });
-  }, [updateAll, filterValues, updatePrice, updateStock, form]);
+
+    const prices: Record<string, { price: number; discountPrice: number; stockCount: number }> = {};
+    updatedVariants.forEach((variant) => {
+      const key = variant.properties.map((p) => p.value).join(" ");
+      prices[key] = {
+        price: variant.price,
+        discountPrice: variant.discountPrice,
+        stockCount: variant.stockCount,
+      };
+    });
+
+    form.setFieldsValue({
+      prices,
+    });
+
+    return updatedVariants;
+  });
+}, [updateAll, filterValues, updatePrice, updateDiscountPrice, updateStock, form]);
 
   const handleFilterChange = (type: string, value: string | undefined) => {
     setFilterValues((prev) => ({ ...prev, [type]: value }));
@@ -625,6 +633,9 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
           price:
             values.prices?.[variant.properties.map((p) => p.value).join(" ")]
               ?.price || 0,
+          discountPrice:
+            values.discountPrices?.[variant.properties.map((p) => p.value).join(" ")]
+              ?.discountPrice || 0,
           stockCount:
             values.prices?.[variant.properties.map((p) => p.value).join(" ")]
               ?.stockCount || 0,
@@ -683,6 +694,24 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             "price",
           ]}
           initialValue={record.price}
+          noStyle
+        >
+          <InputNumber
+            min={0}
+            step={0.01}
+            style={{ width: 120, borderRadius: 6 }}
+          />
+        </Form.Item>
+      ),
+    },
+    {
+      title: "Giảm giá",
+      dataIndex: "discountPrice",
+      key: "discountPrice",
+      render: (_: any, record: ProductVariant) => (
+        <Form.Item
+          name={[ "discountPrices", record.properties.map((p) => p.value).join(" "), "discountPrice" ]}
+          initialValue={record.discountPrice}
           noStyle
         >
           <InputNumber
@@ -994,6 +1023,24 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             value={updatePrice}
                             onChange={(value) =>
                               setUpdatePrice(value as number | null)
+                            }
+                          />
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                          }}
+                        >
+                          <Text strong>Giá Sau Giảm</Text>
+                          <InputNumber
+                            min={0}
+                            step={0.01}
+                            style={{ width: 120, borderRadius: 6 }}
+                            value={updateDiscountPrice}
+                            onChange={(value) =>
+                              setUpdateDiscountPrice(value as number | null)
                             }
                           />
                         </div>

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Table, Button, Switch } from "antd";
 import {
   FireOutlined,
@@ -9,6 +9,7 @@ import {
 } from "@ant-design/icons";
 import moment from "moment";
 import { Product } from "@/types/product";
+import ConfirmModal from "@/components/ConfirmModal"; // Import ConfirmModal
 
 interface ProductTableProps {
   products: Product[];
@@ -31,6 +32,28 @@ const ProductTable: React.FC<ProductTableProps> = ({
   totalItems,
   onPageChange,
 }) => {
+  const [isModalVisible, setIsModalVisible] = useState(false); // Modal visibility state
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null); // Product to be deleted
+
+  // Show the confirmation modal when delete is clicked
+  const showConfirmModal = (product: Product) => {
+    setProductToDelete(product);
+    setIsModalVisible(true);
+  };
+
+  // Handle confirmation (delete product)
+  const handleDeleteConfirm = () => {
+    if (productToDelete) {
+      onDelete(productToDelete.id);
+      setIsModalVisible(false);
+    }
+  };
+
+  // Handle modal cancellation
+  const handleCancel = () => {
+    setIsModalVisible(false);
+  };
+
   const columns = [
     { title: "Name", dataIndex: "name", key: "name" },
     {
@@ -82,26 +105,40 @@ const ProductTable: React.FC<ProductTableProps> = ({
             onClick={() => onEdit(record)}
             style={{ marginRight: 8 }}
           />
-          <Button icon={<DeleteOutlined />} danger onClick={() => onDelete(record.id)} />
+          <Button
+            icon={<DeleteOutlined />}
+            danger
+            onClick={() => showConfirmModal(record)} // Show confirm modal when delete is clicked
+          />
         </>
       ),
     },
   ];
 
   return (
-    <Table
-      columns={columns}
-      dataSource={products}
-      loading={loading}
-      rowKey="id"
-      pagination={{
-        current: currentPage,
-        pageSize,
-        total: totalItems,
-        onChange: onPageChange,
-        position: ["bottomCenter"],
-      }}
-    />
+    <>
+      <Table
+        columns={columns}
+        dataSource={products}
+        loading={loading}
+        rowKey="id"
+        pagination={{
+          current: currentPage,
+          pageSize,
+          total: totalItems,
+          onChange: onPageChange,
+          position: ["bottomCenter"],
+        }}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        visible={isModalVisible}
+        text={`Are you sure you want to delete the product "${productToDelete?.name}"?`}
+        onConfirm={handleDeleteConfirm} // Delete product on confirm
+        onCancel={handleCancel} // Close modal on cancel
+      />
+    </>
   );
 };
 
